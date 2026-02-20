@@ -1,0 +1,72 @@
+{
+  "common": {
+    "optional": "optional"
+  },
+  "app": {
+    "name": "Carls Calendar",
+    "tagline": "Calm. Aware. Routine. Learning."
+  },
+  "nav": {
+    "home": "Home",
+    "about": "About",
+    "contact": "Contact",
+    "login": "Log in",
+    "register": "Register",
+    "dashboard": "Dashboard",
+    "schedules": "Schedules",
+    "calendar": "Calendar",
+    "children": "Children",
+    "logout": "Log out"
+  },
+  "auth": {
+    "username": "Username",
+    "email": "Email address",
+    "password": "Password",
+    "confirm_password": "Confirm password",
+    "login": "Log in",
+    "register": "Create account",
+    "forgot_password": "Forgot password?",
+    "reset_password": "Reset password",
+    "send_reset_link": "Send reset link",
+    "verify_email": "Verify email",
+    "username": "Username"
+  },
+  "schedule": {
+    "title": "Title",
+    "description": "Description",
+    "start_time": "Start time",
+    "end_time": "End time",
+    "picture": "Picture",
+    "add_item": "Add item",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "archive": "Archive",
+    "restore": "Restore",
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "archived": "Archived"
+    }
+  },
+  "calendar": {
+    "week": "Week {{week}}",
+    "prev_week": "Previous week",
+    "next_week": "Next week",
+    "days": {
+      "mon": "Monday",
+      "tue": "Tuesday",
+      "wed": "Wednesday",
+      "thu": "Thursday",
+      "fri": "Friday",
+      "sat": "Saturday",
+      "sun": "Sunday"
+    }
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "not_found": "Page not found.",
+    "unauthorized": "You must be logged in to view this page.",
+    "forbidden": "You do not have permission to view this page."
+  }
+}

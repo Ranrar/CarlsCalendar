@@ -1,0 +1,63 @@
+/* ─── Print Styles ─────────────────────────────────────────
+   Applied when the user prints via Ctrl+P or the print button.
+   Hides navigation/UI chrome and formats content for paper (A4/Letter).
+───────────────────────────────────────────────────────── */
+
+@media print {
+  /* Force light background & dark text for readability */
+  :root {
+    --bg:       #ffffff;
+    --bg-surface: #f5f5f5;
+    --text:     #111111;
+    --text-muted: #444444;
+    --border:   #cccccc;
+  }
+
+  body {
+    background: #fff;
+    color: #111;
+    font-size: 12pt;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  /* Hide non-printable UI */
+  nav,
+  .no-print,
+  .btn,
+  footer {
+    display: none !important;
+  }
+
+  /* Avoid page breaks inside cards / schedule items */
+  .card,
+  .schedule-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  h1, h2, h3 {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  /* Print links as text (no underline noise) */
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  /* Week view grid: force single column on narrow paper */
+  .week-grid {
+    display: block !important;
+  }
+
+  /* Show picture at full width for schedule items */
+  .schedule-item__image {
+    max-width: 80px;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 20mm 15mm;
+  }
+}

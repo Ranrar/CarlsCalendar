@@ -1,0 +1,72 @@
+{
+  "common": {
+    "optional": "valgfri"
+  },
+  "app": {
+    "name": "Carls Calendar",
+    "tagline": "Ro. Opmærksomhed. Rutine. Læring."
+  },
+  "nav": {
+    "home": "Hjem",
+    "about": "Om os",
+    "contact": "Kontakt",
+    "login": "Log ind",
+    "register": "Registrer",
+    "dashboard": "Oversigt",
+    "schedules": "Skemaer",
+    "calendar": "Kalender",
+    "children": "Børn",
+    "logout": "Log ud"
+  },
+  "auth": {
+    "username": "Brugernavn",
+    "email": "E-mailadresse",
+    "password": "Adgangskode",
+    "confirm_password": "Bekræft adgangskode",
+    "login": "Log ind",
+    "register": "Opret konto",
+    "forgot_password": "Glemt adgangskode?",
+    "reset_password": "Nulstil adgangskode",
+    "send_reset_link": "Send nulstillingslink",
+    "verify_email": "Bekræft e-mail",
+    "username": "Brugernavn"
+  },
+  "schedule": {
+    "title": "Titel",
+    "description": "Beskrivelse",
+    "start_time": "Starttidspunkt",
+    "end_time": "Sluttidspunkt",
+    "picture": "Billede",
+    "add_item": "Tilføj punkt",
+    "save": "Gem",
+    "cancel": "Annullér",
+    "delete": "Slet",
+    "archive": "Arkivér",
+    "restore": "Gendan",
+    "status": {
+      "active": "Aktiv",
+      "inactive": "Inaktiv",
+      "archived": "Arkiveret"
+    }
+  },
+  "calendar": {
+    "week": "Uge {{week}}",
+    "prev_week": "Forrige uge",
+    "next_week": "Næste uge",
+    "days": {
+      "mon": "Mandag",
+      "tue": "Tirsdag",
+      "wed": "Onsdag",
+      "thu": "Torsdag",
+      "fri": "Fredag",
+      "sat": "Lørdag",
+      "sun": "Søndag"
+    }
+  },
+  "errors": {
+    "generic": "Noget gik galt. Prøv igen.",
+    "not_found": "Siden blev ikke fundet.",
+    "unauthorized": "Du skal være logget ind for at se denne side.",
+    "forbidden": "Du har ikke adgang til denne side."
+  }
+}

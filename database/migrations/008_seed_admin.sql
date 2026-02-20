@@ -1,0 +1,4 @@
+-- Migration 008: admin seed placeholder
+-- The Rust backend seeds the admin account at startup via auth::seed::seed_accounts().
+-- No SQL seeding here — password hashing requires the Rust runtime (argon2id).
+-- This file is intentionally a no-op.

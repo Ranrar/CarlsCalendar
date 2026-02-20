@@ -1,0 +1,51 @@
+# ─── Environment ────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Docker ─────────────────────────────────────────────────
+database/data/
+docker-compose.dev.yml
+
+# ─── Frontend ───────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+frontend/coverage/
+
+# ─── Backend ────────────────────────────────────────────────
+backend/target/
+backend/**/*.orig
+
+# ─── Uploads (user-generated content) ───────────────────────
+uploads/
+
+# ─── Certs (never commit private keys or certs) ─────────────
+nginx/certs/
+
+# ─── Editor ─────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS ─────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ─── Logs ───────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Misc ───────────────────────────────────────────────────
+*.bak
+*.tmp
+*.orig

@@ -1,0 +1,17 @@
+# Rust build artifacts
+backend/target/
+
+# Node / frontend
+frontend/node_modules/
+frontend/dist/
+
+# Env & secrets
+.env
+*.env.local
+
+# Dev overrides
+docker-compose.dev.yml
+
+# Misc
+**/*.log
+.git/

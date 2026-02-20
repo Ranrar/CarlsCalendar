@@ -1,0 +1,93 @@
+/* CarlsCalendar — CSS Custom Properties (Design Phase 0) */
+
+:root {
+  /* ─── Backgrounds ─────────────────────────────────────── */
+  --bg:          #0b0d12;
+  --bg-alt:      #0f1117;
+  --bg-surface:  #151822;
+  --bg-raised:   #1c2030;
+  --bg-extra:    #0e1523;
+
+  /* ─── Borders ─────────────────────────────────────────── */
+  --border:       rgba(255 255 255 / 0.07);
+  --border-hover: rgba(255 255 255 / 0.14);
+
+  /* ─── Accent palette ──────────────────────────────────── */
+  --accent:          #e07b39;   /* Rust/amber — primary CTA */
+  --accent-light:    #f29553;
+  --accent-dim:      rgba(224 123 57 / 0.15);
+  --accent-yellow:   #f5c518;   /* Golden yellow */
+  --accent-blue:     #4a8cf7;   /* secondary accent */
+  --accent-blue-dim: rgba(74 140 247 / 0.12);
+  --extra-color:     #3a9abf;   /* teal */
+
+  /* ─── Text ─────────────────────────────────────────────── */
+  --text:       #e8eaf0;
+  --text-muted: #9da3b4;
+  --text-dim:   #636878;
+
+  /* ─── Typography ──────────────────────────────────────── */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* ─── Spacing scale ───────────────────────────────────── */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ─── Radii ───────────────────────────────────────────── */
+  --radius-sm: 0.375rem;
+  --radius:    0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* ─── Shadows ─────────────────────────────────────────── */
+  --shadow-sm: 0 1px 3px rgba(0 0 0 / 0.4);
+  --shadow:    0 4px 12px rgba(0 0 0 / 0.5);
+  --shadow-lg: 0 8px 32px rgba(0 0 0 / 0.6);
+
+  /* ─── Transitions ─────────────────────────────────────── */
+  --transition: 150ms ease;
+
+  /* ─── Z-index scale ───────────────────────────────────── */
+  --z-dropdown: 100;
+  --z-modal:    200;
+  --z-toast:    300;
+
+  /* ─── Animated gradient stops (dark mode) ────────────── */
+  --grad-1: #0b0d12;   /* base bg — deep navy-black       */
+  --grad-2: #0e111a;   /* slightly warmer dark navy        */
+  --grad-3: #111420;   /* dark slate                       */
+  --grad-4: #1a1c24;   /* dark silver — faint metallic     */
+}
+
+/* ─── Light theme overrides ─────────────────────────────────── */
+[data-theme="light"] {
+  --bg:          #f4f6fb;
+  --bg-alt:      #ebeef5;
+  --bg-surface:  #ffffff;
+  --bg-raised:   #e4e8f2;
+  --bg-extra:    #dde2ef;
+
+  --border:       rgba(0 0 0 / 0.09);
+  --border-hover: rgba(0 0 0 / 0.18);
+
+  --text:       #141720;
+  --text-muted: #4b5268;
+  --text-dim:   #8890a8;
+
+  --shadow-sm: 0 1px 3px rgba(0 0 0 / 0.1);
+  --shadow:    0 4px 12px rgba(0 0 0 / 0.12);
+  --shadow-lg: 0 8px 32px rgba(0 0 0 / 0.15);
+
+  /* ─── Animated gradient stops (light mode) ───────────── */
+  --grad-1: #f4f6fb;   /* base bg — cool blue-white        */
+  --grad-2: #fdeee3;   /* faint accent warmth (amber ~8%)  */
+  --grad-3: #f8f2ec;   /* warm cream                       */
+  --grad-4: #eef2fc;   /* back to cool                     */
+}
