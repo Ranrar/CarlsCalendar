@@ -345,6 +345,7 @@ For production TLS/HSTS hardening, use `nginx/nginx.prod.conf` with valid certs 
 - `documents/UI_MANUAL.md` — frontend UI conventions and QA checklist.
 - `documents/SECURITY_INCIDENT_RUNBOOK.md` — incident response workflow and breach handling.
 - `documents/VISUAL_SUPPORT_TECH_SPEC.md` — visual support technical specification and rollout notes.
+- `SECURITY.md` — vulnerability reporting policy and dependency risk acceptance notes.
 
 ---
 
