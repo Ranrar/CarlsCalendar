@@ -5,18 +5,19 @@
   "description": "Carls Calendar — visual scheduling app for children with ASD",
   "type": "module",
   "scripts": {
-    "dev":     "vite",
-    "build":   "tsc && vite build",
+    "dev": "vite",
+    "build": "tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@vvo/tzdb": "^6.198.0",
     "i18next": "^23.16.8",
-    "qrcode":  "^1.5.4"
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/qrcode": "^1.5.5",
-    "typescript":    "^5.7.3",
-    "vite":          "^6.1.0"
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
   }
 }

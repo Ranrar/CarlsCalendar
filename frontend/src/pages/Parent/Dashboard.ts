@@ -9,9 +9,9 @@ interface Child {
 
 export async function render(container: HTMLElement): Promise<void> {
   container.innerHTML = `
-    <main class="container" style="padding-top:2rem">
+    <main class="container page-content">
       <h1>${t('nav.dashboard')}</h1>
-      <section id="children-list" style="margin-top:2rem;display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+      <section id="children-list" class="dashboard-children-grid">
         <p>Loading…</p>
       </section>
     </main>
@@ -28,13 +28,13 @@ export async function render(container: HTMLElement): Promise<void> {
     list.innerHTML = children.map((child) => `
       <div class="card">
         <h3>${child.display_name}</h3>
-        <p style="margin-top:.5rem">
+        <p class="dashboard-children-links">
           <a href="/calendar?child=${child.id}">${t('nav.calendar')}</a> ·
           <a href="/schedules?child=${child.id}">${t('nav.schedules')}</a>
         </p>
       </div>
     `).join('');
   } catch {
-    list.innerHTML = `<p style="color:#e05555">${t('errors.generic')}</p>`;
+    list.innerHTML = `<p class="error-msg">${t('errors.generic')}</p>`;
   }
 }

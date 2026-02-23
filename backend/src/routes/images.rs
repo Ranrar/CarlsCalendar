@@ -45,6 +45,10 @@ async fn list_images(
     State(state): State<AppState>,
     Extension(user): Extension<AuthUser>,
 ) -> AppResult<Json<Vec<ImageRow>>> {
+    if user.role == UserRole::Child {
+        return Err(AppError::Forbidden);
+    }
+
     let pool = &state.pool;
     let rows: Vec<ImageRow> = if user.role == UserRole::Admin {
         sqlx::query_as::<_, ImageRow>(
@@ -73,6 +77,10 @@ async fn upload_image(
     Extension(user): Extension<AuthUser>,
     mut multipart: Multipart,
 ) -> AppResult<(StatusCode, Json<ImageRow>)> {
+    if user.role == UserRole::Child {
+        return Err(AppError::Forbidden);
+    }
+
     let pool = &state.pool;
 
     let mut file_data: Option<(String, Vec<u8>)> = None; // (original_filename, bytes)
@@ -145,6 +153,10 @@ async fn delete_image(
     Extension(user): Extension<AuthUser>,
     Path(id): Path<String>,
 ) -> AppResult<StatusCode> {
+    if user.role == UserRole::Child {
+        return Err(AppError::Forbidden);
+    }
+
     let pool = &state.pool;
 
     let row: ImageRow = sqlx::query_as::<_, ImageRow>(

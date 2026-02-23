@@ -17,7 +17,6 @@ pub struct User {
     pub parent_id:            Option<Uuid>,
     pub is_verified:          bool,
     pub is_active:            bool,
-    pub must_change_password: bool,
     pub created_at:           NaiveDateTime,
     pub updated_at:           NaiveDateTime,
     pub deleted_at:           Option<NaiveDateTime>,

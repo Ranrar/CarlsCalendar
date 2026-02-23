@@ -3,7 +3,7 @@ import { api, ApiError } from '@/api/client';
 
 export function render(container: HTMLElement): void {
   container.innerHTML = `
-    <main class="container page-content" style="max-width:640px">
+    <main class="container page-content">
       <h1>${t('nav.contact')}</h1>
       <p class="page-lead">Have a question or need help? Send us a message and we’ll get back to you shortly.</p>
       <form id="contact-form" class="card form-stack" style="margin-top:1.5rem">

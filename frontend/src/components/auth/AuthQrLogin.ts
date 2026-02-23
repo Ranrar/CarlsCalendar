@@ -1,6 +1,5 @@
-import { api, ApiError } from '@/api/client';
 import { router } from '@/router';
-import { t } from '@/i18n/i18n';
+import { api, ApiError } from '@/api/client';
 
 export function render(container: HTMLElement): void {
   container.innerHTML = `
@@ -11,12 +10,15 @@ export function render(container: HTMLElement): void {
         <p style="margin-top:.5rem">
           Point your camera at your QR code, or type the token manually below.
         </p>
+        <p class="muted" style="margin-top:.25rem">
+          QR tokens are created and shown by a parent in the child management page.
+        </p>
         <form id="qr-form" class="form-stack" style="margin-top:1.5rem;text-align:left">
           <div>
             <label for="token">QR Token</label>
             <input id="token" type="text" autocomplete="off" required />
           </div>
-          <button type="submit" class="btn btn-primary">Log in</button>
+          <button type="submit" class="btn btn-primary">Open calendar</button>
           <p id="error-msg" class="error-msg" aria-live="polite"></p>
         </form>
         <div class="form-footer" style="align-items:center">
@@ -30,6 +32,17 @@ export function render(container: HTMLElement): void {
   const tokenParam = params.get('token');
   if (tokenParam) {
     container.querySelector<HTMLInputElement>('#token')!.value = tokenParam;
+
+    // Scanned QR flow: pair immediately and open child calendar.
+    (async () => {
+      try {
+        await api.post('/auth/child/pair', { token: tokenParam.trim() });
+        router.replace('/my-calendar');
+      } catch (err) {
+        const errorMsg = container.querySelector<HTMLParagraphElement>('#error-msg')!;
+        errorMsg.textContent = err instanceof ApiError ? err.message : 'Unable to pair device.';
+      }
+    })();
   }
 
   const form = container.querySelector<HTMLFormElement>('#qr-form')!;
@@ -38,13 +51,17 @@ export function render(container: HTMLElement): void {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorMsg.textContent = '';
-    const token = form.querySelector<HTMLInputElement>('#token')!.value;
+    const token = form.querySelector<HTMLInputElement>('#token')!.value.trim();
+    if (!token) {
+      errorMsg.textContent = 'Please enter a QR token.';
+      return;
+    }
 
     try {
-      await api.post('/auth/qr-login', { token });
+      await api.post('/auth/child/pair', { token });
       router.replace('/my-calendar');
     } catch (err) {
-      errorMsg.textContent = err instanceof ApiError ? err.message : t('errors.generic');
+      errorMsg.textContent = err instanceof ApiError ? err.message : 'Unable to pair device.';
     }
   });
 }

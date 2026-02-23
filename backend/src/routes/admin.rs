@@ -5,7 +5,7 @@
 use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
-    routing::{get, post, put},
+    routing::{get, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -25,8 +25,8 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/admin/users",         get(list_users))
         .route("/admin/users/{id}",     put(update_user).delete(delete_user))
-        .route("/admin/templates",     post(create_template))
-        .route("/admin/templates/{id}", put(update_template))
+        .route("/admin/templates",     get(list_templates).post(create_template))
+        .route("/admin/templates/{id}", put(update_template).delete(delete_template))
         .route_layer(admin_guard)
 }
 
@@ -34,20 +34,20 @@ pub fn router() -> Router<AppState> {
 
 #[derive(sqlx::FromRow, Serialize)]
 struct UserRow {
-    id:                   String,
-    email:                Option<String>,
-    username:             Option<String>,
-    role:                 String,
-    language:             String,
-    parent_id:            Option<String>,
-    is_verified:          bool,
-    is_active:            bool,
-    must_change_password: bool,
+    id:          String,
+    email:       Option<String>,
+    username:    Option<String>,
+    role:        String,
+    language:    String,
+    parent_id:   Option<String>,
+    is_verified: bool,
+    is_active:   bool,
 }
 
 #[derive(sqlx::FromRow, Serialize)]
 struct TemplateRow {
     id:      String,
+    owner_id: String,
     name:    String,
     status:  String,
 }
@@ -56,9 +56,8 @@ struct TemplateRow {
 
 #[derive(Deserialize)]
 struct UpdateUserBody {
-    is_active:            Option<bool>,
-    role:                 Option<String>,
-    must_change_password: Option<bool>,
+    is_active: Option<bool>,
+    role:      Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -80,7 +79,7 @@ async fn list_users(
     let pool = &state.pool;
     let rows: Vec<UserRow> = sqlx::query_as::<_, UserRow>(
         "SELECT id, email, username, role, language, parent_id,
-                is_verified, is_active, must_change_password
+                is_verified, is_active
          FROM users
          WHERE deleted_at IS NULL
          ORDER BY role, username",
@@ -115,14 +114,9 @@ async fn update_user(
         sqlx::query("UPDATE users SET role = ? WHERE id = ?")
             .bind(role).bind(&id).execute(pool).await?;
     }
-    if let Some(v) = body.must_change_password {
-        sqlx::query("UPDATE users SET must_change_password = ? WHERE id = ?")
-            .bind(v).bind(&id).execute(pool).await?;
-    }
-
     let row: UserRow = sqlx::query_as::<_, UserRow>(
         "SELECT id, email, username, role, language, parent_id,
-                is_verified, is_active, must_change_password
+                is_verified, is_active
          FROM users WHERE id = ?",
     )
     .bind(&id).fetch_one(pool).await?;
@@ -160,10 +154,26 @@ async fn create_template(
     .execute(pool).await?;
 
     let row: TemplateRow = sqlx::query_as::<_, TemplateRow>(
-        "SELECT id, name, status FROM schedules WHERE id = ?",
+        "SELECT id, owner_id, name, status FROM schedules WHERE id = ?",
     )
     .bind(&id).fetch_one(pool).await?;
     Ok((StatusCode::CREATED, Json(row)))
+}
+
+async fn list_templates(
+    State(state): State<AppState>,
+    Extension(_admin): Extension<AuthUser>,
+) -> AppResult<Json<Vec<TemplateRow>>> {
+    let pool = &state.pool;
+    let rows: Vec<TemplateRow> = sqlx::query_as::<_, TemplateRow>(
+        "SELECT id, owner_id, name, status
+         FROM schedules
+         WHERE is_template = 1
+         ORDER BY status, name",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(Json(rows))
 }
 
 async fn update_template(
@@ -185,8 +195,31 @@ async fn update_template(
     }
 
     let row: TemplateRow = sqlx::query_as::<_, TemplateRow>(
-        "SELECT id, name, status FROM schedules WHERE id = ?",
+        "SELECT id, owner_id, name, status FROM schedules WHERE id = ?",
     )
     .bind(&id).fetch_one(pool).await?;
     Ok(Json(row))
+}
+
+async fn delete_template(
+    State(state): State<AppState>,
+    Extension(_admin): Extension<AuthUser>,
+    Path(id): Path<String>,
+) -> AppResult<StatusCode> {
+    let pool = &state.pool;
+    let affected = sqlx::query(
+        "UPDATE schedules
+         SET status = 'archived'
+         WHERE id = ? AND is_template = 1",
+    )
+    .bind(&id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+
+    if affected == 0 {
+        return Err(AppError::NotFound);
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }

@@ -1,8 +1,24 @@
-import { t, setLanguage } from '@/i18n/i18n';
-import { router } from '@/router';
-import { theme } from '@/utils/theme';
+/**
+ * Nav.ts — public top navigation bar (shown only when NOT logged in).
+ * Authenticated pages use Sidebar.ts instead.
+ */
 
-/** Build the UIverse sun/moon toggle markup */
+import { t, setLanguage } from '@/i18n/i18n';
+import { theme } from '@/utils/theme';
+import { session } from '@/auth/session';
+import { api } from '@/api/client';
+
+// ── Icons ────────────────────────────────────────────────────
+
+function aboutSvg(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9h.01" /><path d="M11 12h1v4h1" /><path d="M12 3c7.2 0 9 1.8 9 9s-1.8 9 -9 9s-9 -1.8 -9 -9s1.8 -9 9 -9z" /></svg>`;
+}
+function contactSvg(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10z" /><path d="M3 7l9 6l9 -6" /></svg>`;
+}
+// ── Theme toggle ─────────────────────────────────────────────
+
+/** UIverse sun/moon animated theme toggle */
 function themeToggleHtml(isDark: boolean): string {
   return `
   <label class="switch" title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
@@ -32,37 +48,29 @@ function themeToggleHtml(isDark: boolean): string {
   </label>`;
 }
 
+function topNavLink(href: string, icon: string, label: string): string {
+  const isActive = window.location.pathname === href;
+  return `<a class="nav__link${isActive ? ' nav__link--active' : ''}" href="${href}"${isActive ? ' aria-current="page"' : ''}>${icon}<span>${label}</span></a>`;
+}
+
 /**
- * Renders the top navigation bar into `target`.
- * Call once during app init or re-render after auth state changes.
+ * Renders the public top navigation bar into `target`.
+ * Only used when the user is NOT authenticated (public pages).
  */
-export function renderNav(target: HTMLElement, isLoggedIn: boolean, role?: 'parent' | 'child' | 'admin'): void {
+export function renderNav(target: HTMLElement): void {
   const currentLang = localStorage.getItem('lang') ?? 'en';
   const isDark = (localStorage.getItem('theme') ?? 'dark') === 'dark';
-
-  const parentLinks = isLoggedIn && role !== 'child' ? `
-    <a href="/dashboard">${t('nav.dashboard')}</a>
-    <a href="/children">${t('nav.children')}</a>
-    <a href="/schedules">${t('nav.schedules')}</a>
-    <a href="/calendar">${t('nav.calendar')}</a>
-  ` : '';
-
-  const childLinks = isLoggedIn && role === 'child' ? `
-    <a href="/my-calendar">${t('nav.calendar')}</a>
-  ` : '';
-
-  const authLinks = isLoggedIn
-    ? `<button id="nav-logout" class="btn btn-secondary" style="padding:.375rem .875rem">${t('nav.logout')}</button>`
-    : `<a class="btn btn-secondary" href="/login" style="padding:.375rem .875rem">${t('nav.login')}</a>`;
 
   target.innerHTML = `
     <nav class="nav" aria-label="Main navigation">
       <div class="container nav__inner">
-        <a class="nav__brand" href="/">${t('app.name')}</a>
+        <a class="nav__brand" href="/">
+          <span class="nav__brand-mark">CC</span>
+          ${t('app.name')}
+        </a>
         <div class="nav__links">
-          ${parentLinks}
-          ${childLinks}
-          <a href="/about">${t('nav.about')}</a>
+          ${topNavLink('/about', aboutSvg(), t('nav.about'))}
+          ${topNavLink('/contact', contactSvg(), t('nav.contact'))}
         </div>
         <div class="nav__actions">
           <div class="lang-switcher" role="group" aria-label="Language">
@@ -70,20 +78,18 @@ export function renderNav(target: HTMLElement, isLoggedIn: boolean, role?: 'pare
             <button class="lang-btn ${currentLang === 'da' ? 'lang-btn--active' : ''}" data-lang="da">DA</button>
           </div>
           ${themeToggleHtml(isDark)}
-          ${authLinks}
         </div>
       </div>
     </nav>
   `;
 
-  // Theme toggle — animate only on real user interaction (not on nav re-renders)
+  // Animated theme toggle
   target.querySelector<HTMLInputElement>('#theme-toggle')?.addEventListener('change', (e) => {
     const input = e.target as HTMLInputElement;
     const sunMoon = target.querySelector<HTMLElement>('.sun-moon');
     if (sunMoon) {
-      // Remove leftover classes first and force a reflow so re-adding works
       sunMoon.classList.remove('to-moon', 'to-sun');
-      void sunMoon.offsetWidth; // reflow
+      void sunMoon.offsetWidth;
       sunMoon.classList.add(input.checked ? 'to-moon' : 'to-sun');
       sunMoon.addEventListener('animationend', () => {
         sunMoon.classList.remove('to-moon', 'to-sun');
@@ -97,21 +103,11 @@ export function renderNav(target: HTMLElement, isLoggedIn: boolean, role?: 'pare
     btn.addEventListener('click', async () => {
       const lang = btn.dataset['lang'] as 'en' | 'da';
       await setLanguage(lang);
+      if (session.isLoggedIn) {
+        api.patch('/users/me', { language: lang }).catch(() => { /* non-fatal */ });
+      }
       window.dispatchEvent(new CustomEvent('nav:update'));
-      // Re-render the current page so translated strings update
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-  });
-
-  // Logout
-  target.querySelector('#nav-logout')?.addEventListener('click', async () => {
-    try {
-      const { api } = await import('@/api/client');
-      await api.post('/auth/logout', {});
-    } finally {
-      const { session } = await import('@/auth/session');
-      session.clear();
-      router.replace('/login');
-    }
   });
 }

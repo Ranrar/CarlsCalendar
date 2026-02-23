@@ -21,6 +21,9 @@ backend/**/*.orig
 
 # ─── Uploads (user-generated content) ───────────────────────
 uploads/
+backend/assets_seed/pictograms/*
+!backend/assets_seed/.gitkeep
+!backend/assets_seed/pictograms/.gitkeep
 
 # ─── Certs (never commit private keys or certs) ─────────────
 nginx/certs/

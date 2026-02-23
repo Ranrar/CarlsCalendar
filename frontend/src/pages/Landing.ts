@@ -37,8 +37,11 @@ export function render(container: HTMLElement): void {
   container.innerHTML = `
     <main class="landing">
       <section class="hero container">
+        <div class="hero__brand">
+          <span class="hero__brand-mark">CC</span>
+          <h1 class="hero__title">${t('app.name')}</h1>
+        </div>
         <span class="hero__eyebrow">C.A.R.L. — ${t('app.tagline')}</span>
-        <h1 class="hero__title">${t('app.name')}</h1>
         <p class="hero__tagline">
           A visual scheduling app designed for children and adults with autism spectrum disorder.
         </p>

@@ -43,6 +43,20 @@ export function render(container: HTMLElement): void {
         <h2>6. Contact</h2>
         <p>For privacy questions, use the <a href="/contact">contact form</a>.</p>
       </section>
+
+      <section class="legal-section">
+        <h2>7. Cookie consent</h2>
+        <p>You may withdraw your cookie consent at any time. This will remove your preference
+        cookie and reload the page so the consent banner reappears.</p>
+        <p style="margin-top:.75rem">
+          <button id="btn-withdraw-consent" class="btn btn-secondary btn-sm">Withdraw cookie consent</button>
+        </p>
+      </section>
     </main>
   `;
+
+  container.querySelector('#btn-withdraw-consent')?.addEventListener('click', async () => {
+    const { withdrawConsent } = await import('@/components/CookieConsent');
+    await withdrawConsent();
+  });
 }

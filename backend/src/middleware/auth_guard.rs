@@ -22,10 +22,8 @@ const SESSION_COOKIE: &str = "session";
 /// extensions by `require_auth`; downstream handlers use `Extension<AuthUser>`.
 #[derive(Debug, Clone)]
 pub struct AuthUser {
-    pub user_id:              String,
-    pub role:                 UserRole,
-    #[allow(dead_code)]
-    pub must_change_password: bool,
+    pub user_id: String,
+    pub role:    UserRole,
 }
 
 /// Middleware: require any valid session cookie.
@@ -43,13 +41,12 @@ pub async fn require_auth(
 
     #[derive(sqlx::FromRow)]
     struct SessionRow {
-        id:                   String,
-        role:                 Option<String>,
-        must_change_password: bool,
+        id:   String,
+        role: Option<String>,
     }
 
     let row = sqlx::query_as::<_, SessionRow>(
-        "SELECT u.id, u.role, u.must_change_password
+        "SELECT u.id, u.role
          FROM user_sessions s
          JOIN users u ON u.id = s.user_id
          WHERE s.token = ?
@@ -71,9 +68,8 @@ pub async fn require_auth(
     };
 
     req.extensions_mut().insert(AuthUser {
-        user_id:              row.id.clone(),
+        user_id: row.id.clone(),
         role,
-        must_change_password: row.must_change_password,
     });
 
     Ok(next.run(req).await)

@@ -26,13 +26,19 @@ pub struct Config {
     pub smtp_password:    String,
     pub smtp_from:        String,
 
-    // Dev account (only active when app_env == "development")
-    pub dev_username:     String,
-    pub dev_password:     String,
-
     // App
     pub app_env:          String,
     pub app_base_url:     String,
+
+    // Compliance / retention
+    pub retention_cleanup_enabled: bool,
+    pub retention_cleanup_interval_minutes: u64,
+
+    // Pictogram prefetch
+    pub pictogram_prefetch_default_enabled: bool,
+    pub pictogram_prefetch_idle_minutes: u64,
+    pub pictogram_prefetch_batch_size: u64,
+    pub pictogram_prefetch_interval_seconds: u64,
 }
 
 #[derive(Debug, Error)]
@@ -57,6 +63,13 @@ impl Config {
                 .map_err(|_| ConfigError::InvalidValue(key.to_string(), raw))
         }
 
+        fn parse_bool_env(key: &str, default: bool) -> bool {
+            match env::var(key) {
+                Ok(v) => matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"),
+                Err(_) => default,
+            }
+        }
+
         Ok(Self {
             db_host:      require("DB_HOST").unwrap_or_else(|_| "db".into()),
             db_port:      parse_port("DB_PORT").unwrap_or(3306),
@@ -75,15 +88,32 @@ impl Config {
             smtp_password: env::var("SMTP_PASSWORD").unwrap_or_default(),
             smtp_from:     env::var("SMTP_FROM").unwrap_or_default(),
 
-            dev_username:  env::var("DEV_USERNAME").unwrap_or_else(|_| "dev".into()),
-            dev_password:  env::var("DEV_PASSWORD").unwrap_or_else(|_| "dev".into()),
-
             app_env:      env::var("APP_ENV").unwrap_or_else(|_| "development".into()),
             app_base_url: env::var("APP_BASE_URL").unwrap_or_else(|_| "http://localhost".into()),
-        })
-    }
 
-    pub fn is_development(&self) -> bool {
-        self.app_env == "development"
+            retention_cleanup_enabled: parse_bool_env("RETENTION_CLEANUP_ENABLED", true),
+            retention_cleanup_interval_minutes: env::var("RETENTION_CLEANUP_INTERVAL_MINUTES")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .filter(|v| *v > 0)
+                .unwrap_or(60),
+
+            pictogram_prefetch_default_enabled: parse_bool_env("PICTOGRAM_PREFETCH_DEFAULT_ENABLED", false),
+            pictogram_prefetch_idle_minutes: env::var("PICTOGRAM_PREFETCH_IDLE_MINUTES")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .filter(|v| *v > 0)
+                .unwrap_or(20),
+            pictogram_prefetch_batch_size: env::var("PICTOGRAM_PREFETCH_BATCH_SIZE")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .filter(|v| *v > 0)
+                .unwrap_or(50),
+            pictogram_prefetch_interval_seconds: env::var("PICTOGRAM_PREFETCH_INTERVAL_SECONDS")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .filter(|v| *v > 0)
+                .unwrap_or(60),
+        })
     }
 }

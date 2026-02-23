@@ -9,6 +9,10 @@ export function render(container: HTMLElement): void {
         <h1>${t('auth.register')}</h1>
         <form id="register-form" class="form-stack">
           <div>
+            <label for="username">${t('auth.username')}</label>
+            <input id="username" type="text" autocomplete="username" required />
+          </div>
+          <div>
             <label for="email">${t('auth.email')}</label>
             <input id="email" type="email" autocomplete="email" required />
           </div>
@@ -36,9 +40,15 @@ export function render(container: HTMLElement): void {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     errorMsg.textContent = '';
+    const username = form.querySelector<HTMLInputElement>('#username')!.value.trim();
     const email = form.querySelector<HTMLInputElement>('#email')!.value;
     const password = form.querySelector<HTMLInputElement>('#password')!.value;
     const confirm = form.querySelector<HTMLInputElement>('#confirm')!.value;
+
+    if (!username) {
+      errorMsg.textContent = 'Username is required.';
+      return;
+    }
 
     if (password !== confirm) {
       errorMsg.textContent = 'Passwords do not match.';
@@ -46,7 +56,20 @@ export function render(container: HTMLElement): void {
     }
 
     try {
-      await api.post('/auth/register', { email, password });
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      const locale = navigator.language || 'en-GB';
+      const uses12h = new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hour12 === true;
+      const weekStart = locale.toLowerCase().startsWith('en-us') ? 7 : 1;
+      await api.post('/auth/register', {
+        username,
+        email,
+        password,
+        timezone,
+        locale,
+        date_format: 'locale',
+        time_format: uses12h ? '12h' : '24h',
+        week_start: weekStart,
+      });
       router.replace('/verify-email');
     } catch (err) {
       errorMsg.textContent = err instanceof ApiError ? err.message : t('errors.generic');

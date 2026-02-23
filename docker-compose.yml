@@ -45,6 +45,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ./backend/assets_seed/pictograms:/app/backend/assets_seed/pictograms
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null"]
       interval: 5s
@@ -66,7 +68,6 @@ services:
       MYSQL_PASSWORD:      ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/mysql
-      - ./database/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
       interval: 10s

@@ -6,9 +6,15 @@ import { api } from '@/api/client';
 
 export interface SessionUser {
   id: string;
-  email: string;
+  email: string | null;
+  username: string | null;
   role: 'parent' | 'child' | 'admin';
-  display_name?: string;
+  language: string;
+  timezone: string;
+  locale: string;
+  date_format: 'locale' | 'dd-mm-yyyy' | 'dd_month_yyyy' | 'mm/dd/yyyy';
+  time_format: '24h' | '12h';
+  week_start: number;
 }
 
 let _user: SessionUser | null = null;

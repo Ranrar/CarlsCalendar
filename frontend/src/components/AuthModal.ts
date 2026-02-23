@@ -90,9 +90,12 @@ function _fillBody(mode: AuthMode): void {
 function _loginHtml(): string {
   return `
     <form id="auth-form" class="form-stack" novalidate>
+      <p class="muted" style="margin-top:0;margin-bottom:.75rem">
+        Parent/Admin login uses email + password. Child access is opened from a parent-generated QR code.
+      </p>
       <div>
-        <label for="am-username">${t('auth.username')}</label>
-        <input id="am-username" type="text" autocomplete="username" required />
+        <label for="am-email">${t('auth.email')}</label>
+        <input id="am-email" type="email" autocomplete="email" required />
       </div>
       <div>
         <label for="am-password">${t('auth.password')}</label>
@@ -103,7 +106,6 @@ function _loginHtml(): string {
     </form>
     <div class="form-footer">
       <a href="/reset-password">${t('auth.forgot_password')}</a>
-      <span>Child? <a href="/qr-login">Scan QR code</a></span>
     </div>`;
 }
 
@@ -115,8 +117,8 @@ function _registerHtml(): string {
         <input id="am-reg-username" type="text" autocomplete="username" required />
       </div>
       <div>
-        <label for="am-email">${t('auth.email')} <span class="label-optional">(${t('common.optional')})</span></label>
-        <input id="am-email" type="email" autocomplete="email" />
+        <label for="am-email">${t('auth.email')}</label>
+        <input id="am-email" type="email" autocomplete="email" required />
       </div>
       <div>
         <label for="am-password">${t('auth.password')}</label>
@@ -164,14 +166,17 @@ function _attachBodyEvents(mode: AuthMode): void {
       errorEl.textContent = '';
       const btn = form.querySelector<HTMLButtonElement>('[type="submit"]')!;
       btn.disabled = true;
-      const username = (document.getElementById('am-username') as HTMLInputElement).value;
+      const email = (document.getElementById('am-email') as HTMLInputElement).value.trim();
       const password  = (document.getElementById('am-password') as HTMLInputElement).value;
       try {
-        await api.post('/auth/login', { username, password });
+        await api.post('/auth/login', { email, password });
         await session.fetch();
         closeAuthModal(false);
-        window.dispatchEvent(new CustomEvent('nav:update'));
-        router.replace('/dashboard');
+        window.dispatchEvent(new CustomEvent('auth:change'));
+        const u = session.user;
+        if (u?.role === 'child') router.replace('/my-calendar');
+        else if (u?.role === 'admin') router.replace('/admin');
+        else                          router.replace('/dashboard');
       } catch (err) {
         errorEl.textContent = err instanceof ApiError ? err.message : t('errors.generic');
       } finally {
@@ -188,25 +193,31 @@ function _attachBodyEvents(mode: AuthMode): void {
       const emailVal  = (document.getElementById('am-email') as HTMLInputElement).value.trim();
       const password  = (document.getElementById('am-password') as HTMLInputElement).value;
       const confirm   = (document.getElementById('am-confirm') as HTMLInputElement).value;
+
+      if (!emailVal) {
+        errorEl.textContent = 'Email is required.';
+        btn.disabled = false;
+        return;
+      }
+
       if (password !== confirm) {
         errorEl.textContent = 'Passwords do not match.';
         btn.disabled = false;
         return;
       }
       try {
-        const body: Record<string, string> = { username, password };
-        if (emailVal) body['email'] = emailVal;
+        const body: Record<string, unknown> = { username, password };
+        body['email'] = emailVal;
+        body['timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        const locale = navigator.language || 'en-GB';
+        const uses12h = new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hour12 === true;
+        body['locale'] = locale;
+        body['date_format'] = 'locale';
+        body['time_format'] = uses12h ? '12h' : '24h';
+        body['week_start'] = locale.toLowerCase().startsWith('en-us') ? 7 : 1;
         await api.post('/auth/register', body);
         closeAuthModal(false);
-        if (emailVal) {
-          router.replace('/verify-email');
-        } else {
-          // No email verification needed — log in immediately
-          await api.post('/auth/login', { username, password });
-          await session.fetch();
-          window.dispatchEvent(new CustomEvent('nav:update'));
-          router.replace('/dashboard');
-        }
+        router.replace('/verify-email');
       } catch (err) {
         errorEl.textContent = err instanceof ApiError ? err.message : t('errors.generic');
       } finally {

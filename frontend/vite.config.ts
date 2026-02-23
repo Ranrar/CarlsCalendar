@@ -22,6 +22,11 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      // Proxy backend-served static assets (e.g. ARASAAC pictograms)
+      '/assets': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
   preview: {

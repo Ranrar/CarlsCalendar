@@ -27,6 +27,10 @@ RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/
 
 WORKDIR /app
 COPY --from=builder /app/backend/target/release/carlscalendar-backend .
+COPY backend/docker-entrypoint.sh /usr/local/bin/backend-entrypoint.sh
+COPY backend/assets_seed /opt/pictogram-seed
+
+RUN chmod +x /usr/local/bin/backend-entrypoint.sh
 
 EXPOSE 8080
-CMD ["./carlscalendar-backend"]
+ENTRYPOINT ["/usr/local/bin/backend-entrypoint.sh"]

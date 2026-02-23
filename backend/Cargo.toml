@@ -51,6 +51,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Errors
 thiserror = "1"
 anyhow    = "1"
+sha2      = "0.10"
+reqwest   = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+urlencoding = "2"
 
 [profile.release]
 opt-level = 3

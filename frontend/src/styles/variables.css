@@ -40,6 +40,9 @@
   --space-12: 3rem;
   --space-16: 4rem;
 
+  /* ─── Shared page width ────────────────────────────────── */
+  --layout-max-width: 1200px;
+
   /* ─── Radii ───────────────────────────────────────────── */
   --radius-sm: 0.375rem;
   --radius:    0.5rem;
@@ -55,10 +58,14 @@
   --transition: 150ms ease;
 
   /* ─── Z-index scale ───────────────────────────────────── */
+  --z-nav:      150;
   --z-dropdown: 100;
   --z-modal:    200;
   --z-toast:    300;
-
+  /* ─── App shell ───────────────────────────────────────────── */
+  --sidebar-width:      15rem;    /* 240px — full sidebar */
+  --topbar-height:      3.25rem;  /* slim logged-in top bar */
+  --bottom-nav-height:  4rem;     /* mobile bottom nav */
   /* ─── Animated gradient stops (dark mode) ────────────── */
   --grad-1: #0b0d12;   /* base bg — deep navy-black       */
   --grad-2: #0e111a;   /* slightly warmer dark navy        */

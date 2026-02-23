@@ -1,63 +1,277 @@
+/* ─── Print-only elements (hidden on screen) ───────────────── */
+.print-only { display: none !important; }
+
 /* ─── Print Styles ─────────────────────────────────────────
    Applied when the user prints via Ctrl+P or the print button.
    Hides navigation/UI chrome and formats content for paper (A4/Letter).
 ───────────────────────────────────────────────────────── */
 
 @media print {
+  /* Restore print-only elements */
+  .print-only { display: block !important; }
+
   /* Force light background & dark text for readability */
   :root {
-    --bg:       #ffffff;
-    --bg-surface: #f5f5f5;
-    --text:     #111111;
-    --text-muted: #444444;
-    --border:   #cccccc;
+    --bg:           #ffffff;
+    --bg-surface:   #f8f8f8;
+    --bg-raised:    #f0f0f0;
+    --text:         #111111;
+    --text-muted:   #444444;
+    --text-dim:     #666666;
+    --border:       #cccccc;
+    --accent:       #c05a1f;
   }
 
   body {
     background: #fff;
     color: #111;
-    font-size: 12pt;
+    font-size: 11pt;
     font-family: Georgia, 'Times New Roman', serif;
+    animation: none !important;
   }
 
-  /* Hide non-printable UI */
+  /* Hide all non-printable UI */
   nav,
   .no-print,
-  .btn,
-  footer {
+  footer,
+  [role="dialog"],
+  .modal-backdrop,
+  .toast {
     display: none !important;
   }
 
-  /* Avoid page breaks inside cards / schedule items */
+  /* Buttons: hidden by default — explicit .print-btn shown with override below */
+  .btn,
+  button:not(.print-btn) {
+    display: none !important;
+  }
+
+  /* Links as plain text */
+  a { text-decoration: none; color: inherit; }
+
+  /* Avoid page breaks inside cards */
   .card,
-  .schedule-item {
+  .item-card,
+  .schedule-item,
+  .week-grid__day {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
   h1, h2, h3 {
-    page-break-after: avoid;
     break-after: avoid;
+    page-break-after: avoid;
   }
 
-  /* Print links as text (no underline noise) */
-  a {
-    text-decoration: none;
-    color: inherit;
-  }
-
-  /* Week view grid: force single column on narrow paper */
-  .week-grid {
-    display: block !important;
-  }
-
-  /* Show picture at full width for schedule items */
-  .schedule-item__image {
-    max-width: 80px;
-  }
-
+  /* Default @page (portrait) */
   @page {
     size: A4 portrait;
     margin: 20mm 15mm;
   }
+
+  /* ── Schedule print layout ──────────────────────────────── */
+
+  .printable-schedule .item-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10pt;
+    padding: 8pt 0;
+    border-bottom: 0.5pt solid #ccc;
+    break-inside: avoid;
+  }
+
+  /* Hide reorder arrows and edit/delete buttons */
+  .printable-schedule .item-card__reorder,
+  .printable-schedule .item-card__actions {
+    display: none !important;
+  }
+
+  .printable-schedule .item-card__time {
+    font-size: 9pt;
+    color: #555;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 52pt;
+  }
+
+  .printable-schedule .item-card__title {
+    font-size: 11pt;
+    font-weight: 600;
+  }
+
+  .printable-schedule .item-card__desc {
+    font-size: 9pt;
+    color: #444;
+    margin-top: 2pt;
+    white-space: pre-wrap;
+  }
+
+  /* If a schedule item has a picture */
+  .printable-schedule .schedule-item__image {
+    width: 56pt;
+    height: 56pt;
+    object-fit: cover;
+    border-radius: 3pt;
+    flex-shrink: 0;
+  }
+
+  /* Status badge — keep on print */
+  .badge { border: 0.5pt solid #aaa; padding: 1pt 5pt; font-size: 8pt; }
+
+  /* ── Week print layout ──────────────────────────────────── */
+
+  .printing-week .week-grid {
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr) !important;
+    gap: 3pt !important;
+    overflow: visible !important;
+  }
+
+  .printing-week .week-grid__day {
+    border: 0.5pt solid #bbb;
+    border-radius: 3pt;
+    padding: 5pt 4pt;
+    min-width: unset;
+    font-size: 8pt;
+  }
+
+  .printing-week .week-grid__day-name {
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #555;
+    margin-bottom: 2pt;
+  }
+
+  .printing-week .week-grid__date {
+    font-size: 7pt;
+    color: #777;
+    margin-bottom: 3pt;
+  }
+
+  .printing-week .day-schedule-badge {
+    font-size: 7pt;
+    padding: 1pt 3pt;
+    margin-bottom: 3pt;
+  }
+
+  /* Week schedule items when printing */
+  .printing-week .schedule-item {
+    padding: 2pt 3pt;
+  }
+
+  .printing-week .schedule-item__image {
+    width: 28pt;
+    height: 28pt;
+  }
+
+  .printing-week .schedule-item__title {
+    font-size: 7pt;
+    font-weight: 600;
+  }
+
+  .printing-week .schedule-item__time {
+    font-size: 6pt;
+  }
+
+  .printing-week .schedule-item__desc {
+    display: none; /* too small to read at this size */
+  }
+
+  /* Week header: show the H2 but hide nav/print buttons */
+  .week-view__header {
+    display: flex !important;
+    justify-content: center !important;
+    margin-bottom: 8pt !important;
+  }
+
+  .week-view__header .js-prev,
+  .week-view__header .js-next,
+  .week-view__header .js-print-week {
+    display: none !important;
+  }
+
+  /* ── Visual support print layout (Phase A) ─────────────── */
+  .printing-visual-support .visual-supports-guidance,
+  .printing-visual-support .visual-supports-sidebar,
+  .printing-visual-support .visual-supports-actions,
+  .printing-visual-support .vs-slot__actions,
+  .printing-visual-support .vs-card__handle {
+    display: none !important;
+  }
+
+  .printing-visual-support .visual-supports-layout {
+    display: block !important;
+  }
+
+  .printing-visual-support .visual-supports-editor {
+    border: 0.5pt solid #bbb;
+    border-radius: 4pt;
+    padding: 8pt;
+    background: #fff !important;
+  }
+
+  .printing-visual-support .visual-supports-editor__hint {
+    margin-bottom: 6pt;
+    font-size: 8pt;
+    color: #555;
+  }
+
+  .printing-visual-support .vs-board {
+    gap: 5pt;
+  }
+
+  .printing-visual-support .vs-slot {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    min-height: 65pt;
+    border: 0.5pt solid #aaa;
+    background: #fff !important;
+    border-radius: 3pt;
+    padding: 5pt;
+  }
+
+  .printing-visual-support .vs-slot__header {
+    font-size: 8pt;
+  }
+
+  .printing-visual-support .vs-card {
+    border: 0.5pt solid #bbb;
+    background: #fff !important;
+    grid-template-columns: 1fr;
+  }
+
+  .printing-visual-support .vs-card__main {
+    display: grid;
+    grid-template-columns: 20pt 1fr;
+    gap: 6pt;
+    align-items: center;
+  }
+
+  .printing-visual-support .vs-card__img {
+    width: 20pt;
+    height: 20pt;
+    object-fit: contain;
+    border: 0.5pt solid #bbb;
+    border-radius: 2pt;
+    background: #fff;
+  }
+
+  .printing-visual-support .vs-card__label {
+    font-size: 10pt;
+  }
+
+  .printing-visual-support .vs-slot__empty {
+    border: 0.5pt dashed #bbb;
+    font-size: 8pt;
+    min-height: 40pt;
+  }
+
+  .printing-visual-support .vs-print-attribution {
+    margin-top: 8pt;
+    font-size: 7pt;
+    color: #666;
+  }
 }
+

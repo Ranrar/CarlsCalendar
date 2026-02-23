@@ -1,0 +1,220 @@
+/* ── Pictogram picker ────────────────────────────────────────── */
+.pict-tabs {
+  display: flex;
+  gap: .375rem;
+  margin-top: .5rem;
+  border-bottom: 2px solid var(--border-subtle, rgba(0,0,0,.1));
+  padding-bottom: 0;
+}
+.pict-tab {
+  background: none;
+  border: none;
+  padding: .35rem .75rem;
+  font-size: .875rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  border-radius: .25rem .25rem 0 0;
+  transition: color .15s, border-color .15s;
+}
+.pict-tab:hover { color: var(--text-primary); }
+.pict-tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.pict-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: .5rem;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.pict-card {
+  position: relative;
+  padding: .35rem;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  background: var(--bg-raised);
+  transition: border-color .15s, background .15s;
+  outline: none;
+  user-select: none;
+  overflow: hidden;
+}
+.pict-card:hover,
+.pict-card:focus { border-color: var(--accent); }
+.pict-card__img {
+  width: 100%;
+  height: 72px;
+  object-fit: contain;
+  display: block;
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+}
+.pict-card__img--broken {
+  display: none;
+}
+.pict-card__img--placeholder {
+  display: none;
+  width: 100%;
+  height: 72px;
+  background: var(--bg-raised);
+  border-radius: var(--radius-sm);
+}
+.pict-card__img--broken + .pict-card__img--placeholder {
+  display: block;
+}
+.pict-card__name {
+  font-size: .72rem;
+  color: var(--text-muted);
+  margin-top: .2rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pict-card__star {
+  position: absolute;
+  top: .15rem;
+  right: .15rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: .1rem .15rem;
+  border-radius: .2rem;
+  transition: color .15s;
+}
+.pict-card__star:hover { color: #f59e0b; }
+.pict-card__star--saved { color: #f59e0b; }
+.pict-grid-span { grid-column: 1 / -1; color: var(--text-muted); }
+
+/* ── Pictogram Library page ─────────────────────────────────────────────── */
+.plib { width: 100%; box-sizing: border-box; }
+.plib__page-header {
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+.plib__attribution { font-size: .75rem; color: var(--text-muted); margin: 0; }
+.plib__tabs { margin-bottom: 1rem; }
+.plib__search-row { display: flex; gap: .5rem; margin-bottom: .5rem; }
+.plib__search-input {
+  flex: 1; padding: .5rem .75rem; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-raised);
+  color: var(--text); font-size: .9rem;
+  transition: border-color .2s;
+}
+.plib__search-input:focus { outline: none; border-color: var(--accent); }
+.plib__search-hint { font-size: .75rem; color: var(--text-muted); margin: 0 0 .75rem; }
+.plib__hint-text { color: var(--text-muted); font-size: .9rem; padding: 2rem 0; text-align: center; grid-column: 1 / -1; }
+.plib__loading { color: var(--text-muted); font-size: .9rem; padding: 1.5rem 0; text-align: center; grid-column: 1 / -1; }
+.plib__empty { color: var(--text-muted); font-size: .9rem; padding: 2rem 0; text-align: center; grid-column: 1 / -1; }
+
+/* Category filter chips */
+.plib__cat-bar { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .75rem; min-height: 0; }
+.plib__cat-chip {
+  padding: .25rem .65rem; border-radius: 999px; font-size: .78rem;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  color: var(--text); cursor: pointer; transition: background .15s, color .15s;
+}
+.plib__cat-chip:hover { background: var(--accent-muted, rgba(249,115,22,.15)); }
+.plib__cat-chip--active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+
+/* Card — extends .pict-card */
+.plib__card { position: relative; }
+
+/* Library page: remove the small-picker height constraint */
+.plib .pict-grid {
+  max-height: none;
+  overflow-y: visible;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+.plib .pict-card__img,
+.plib .pict-card__img--placeholder { height: 90px; }
+
+/* Detail chip tags */
+.plib__chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .35rem; }
+.plib__chip {
+  padding: .2rem .55rem; border-radius: 999px; font-size: .75rem;
+  background: var(--bg-raised); border: 1px solid var(--border);
+  color: var(--text);
+}
+.plib__chip--cat { border-color: var(--accent); color: var(--accent); }
+.plib__chip--tag { border-color: var(--border); opacity: .8; }
+
+/* Detail modal */
+.plib-modal {
+  position: fixed; inset: 0; z-index: 400;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.plib-modal.hidden { display: none; }
+.plib-modal__backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: plib-backdrop-in 0.2s ease both;
+}
+@keyframes plib-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.plib-modal__box {
+  position: relative; z-index: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  width: min(700px, 95vw); max-height: 90vh; overflow-y: auto;
+  padding: 1.75rem;
+  animation: plib-modal-box-in 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) both;
+}
+@keyframes plib-modal-box-in {
+  from { opacity: 0; transform: scale(0.95) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+.plib-modal__close {
+  position: absolute; top: 0.875rem; right: 1rem;
+  background: none; border: none; font-size: 1.5rem; cursor: pointer;
+  color: var(--text-dim); line-height: 1; padding: .25rem .5rem;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition), background var(--transition);
+}
+.plib-modal__close:hover { color: var(--text); background: var(--bg-raised); }
+.plib-modal__content {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 1.5rem;
+}
+@media (max-width: 560px) {
+  .plib-modal__content { grid-template-columns: 1fr; }
+}
+.plib-modal__img-wrap {
+  display: flex; align-items: flex-start; justify-content: center;
+  background: var(--bg-raised); border-radius: var(--radius-lg);
+  padding: .75rem; min-height: 140px;
+}
+.plib-modal__img { width: 100%; max-width: 200px; border-radius: var(--radius-sm); }
+.plib-modal__info { display: flex; flex-direction: column; gap: .75rem; }
+.plib-modal__name-row { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.plib-modal__name { font-size: 1.2rem; font-weight: 700; margin: 0; }
+.plib-modal__star {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .3rem .7rem; border-radius: var(--radius-sm); font-size: .82rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border); color: var(--text);
+  cursor: pointer; white-space: nowrap; transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+.plib-modal__star:hover { background: rgba(245,158,11,.15); }
+.plib-modal__star--saved { border-color: #f59e0b; color: #f59e0b; }
+.plib-modal__desc { font-size: .9rem; color: var(--text-muted); margin: 0; }
+.plib-modal__section { display: flex; flex-direction: column; gap: .2rem; font-size: .85rem; }
+.plib-modal__license { font-size: .72rem; color: var(--text-muted); margin: 0; }
+.plib-modal__id { font-size: .72rem; color: var(--text-muted); margin: 0; }
