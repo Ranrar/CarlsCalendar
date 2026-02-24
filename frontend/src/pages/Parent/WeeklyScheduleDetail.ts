@@ -7,7 +7,7 @@ import { formatClockRangeForUser, normalizeClockInput } from '@/utils/datetime';
 
 // ── Types ────────────────────────────────────────────────────
 
-interface ScheduleItem {
+interface ActivityCard {
   id: string;
   schedule_id: string;
   title: string;
@@ -18,12 +18,12 @@ interface ScheduleItem {
   sort_order: number;
 }
 
-interface ScheduleWithItems {
+interface ScheduleWithActivityCards {
   id: string;
   name: string;
   status: 'active' | 'inactive' | 'archived';
   is_template: boolean;
-  items: ScheduleItem[];
+  activity_cards: ActivityCard[];
 }
 
 interface PictogramSearchItem {
@@ -60,8 +60,17 @@ const STATUS_CLASS: Record<string, string> = {
 // ── Page entry point ─────────────────────────────────────────
 
 export async function render(container: HTMLElement): Promise<void> {
-  // Read schedule ID from URL: /schedules/<id>
-  const scheduleId = location.pathname.split('/').pop()!;
+  // Read schedule ID from URL: /weeklyschedule/<id>
+  const parts = location.pathname.split('/').filter(Boolean);
+  const scheduleId = parts[parts.length - 1];
+  if (!scheduleId) {
+    container.innerHTML = `
+      <main class="container page-content">
+        <div class="empty-state"><p>${t('errors.generic')}</p></div>
+      </main>
+    `;
+    return;
+  }
   const use24hInput = (session.user?.time_format ?? '24h') === '24h';
   const timeInputAttrs = use24hInput
     ? 'type="text" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" placeholder="HH:MM"'
@@ -80,7 +89,7 @@ export async function render(container: HTMLElement): Promise<void> {
         </div>
         <div class="schedule-detail-actions">
           <button class="btn btn-secondary btn-sm no-print" id="btn-print" title="${t('print.schedule')}">🖨 ${t('print.schedule')}</button>
-          <button class="btn btn-primary" id="btn-add-item">+ ${t('schedule.item.add')}</button>
+          <button class="btn btn-primary" id="btn-add-item">+ ${t('schedule.activity_card.add')}</button>
         </div>
       </div>
       <div id="items-list" class="printable-schedule"></div>
@@ -89,7 +98,7 @@ export async function render(container: HTMLElement): Promise<void> {
     <!-- Add / Edit item modal -->
     <div class="modal-backdrop hidden" id="item-modal">
       <dialog class="modal" open role="dialog" aria-modal="true" aria-labelledby="item-modal-title">
-        <h2 id="item-modal-title">${t('schedule.item.new')}</h2>
+        <h2 id="item-modal-title">${t('schedule.activity_card.new')}</h2>
         <form id="item-form" class="form-stack schedule-detail-form">
           <input type="hidden" id="item-id" />
           <div>
@@ -143,8 +152,8 @@ export async function render(container: HTMLElement): Promise<void> {
     <!-- Delete confirm modal -->
     <div class="modal-backdrop hidden" id="delete-modal">
       <dialog class="modal" open role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
-        <h2 id="delete-modal-title">${t('schedule.item.delete_confirm_title')}</h2>
-        <p class="schedule-detail-delete-text">${t('schedule.item.delete_confirm_body')}</p>
+        <h2 id="delete-modal-title">${t('schedule.activity_card.delete_confirm_title')}</h2>
+        <p class="schedule-detail-delete-text">${t('schedule.activity_card.delete_confirm_body')}</p>
         <div class="modal-actions">
           <button class="btn btn-secondary" id="btn-delete-cancel">${t('schedule.cancel')}</button>
           <button class="btn btn-danger" id="btn-delete-confirm">${t('schedule.delete')}</button>
@@ -165,7 +174,7 @@ export async function render(container: HTMLElement): Promise<void> {
   const itemError    = container.querySelector<HTMLParagraphElement>('#item-error')!;
   const deleteErrorEl = container.querySelector<HTMLParagraphElement>('#delete-error')!;
 
-  let items: ScheduleItem[] = [];
+  let activityCards: ActivityCard[] = [];
   let pendingDeleteId: string | null = null;
 
   const pictResults      = container.querySelector<HTMLElement>('#pict-results')!;
@@ -368,12 +377,12 @@ export async function render(container: HTMLElement): Promise<void> {
   async function load(): Promise<void> {
     itemsList.innerHTML = '<div class="empty-state"><p>Loading…</p></div>';
     try {
-      const data = await api.get<ScheduleWithItems>(`/schedules/${scheduleId}`);
+      const data = await api.get<ScheduleWithActivityCards>(`/schedules/${scheduleId}`);
       schedName.textContent = data.name;
       schedBadge.textContent = t(`schedule.status.${data.status}`);
       schedBadge.className = `badge ${STATUS_CLASS[data.status] ?? ''}`;
-      items = data.items;
-      renderItems();
+      activityCards = data.activity_cards;
+      renderActivityCards();
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         itemsList.innerHTML = `<p class="error-msg">${t('errors.not_found')}</p>`;
@@ -384,24 +393,24 @@ export async function render(container: HTMLElement): Promise<void> {
   }
 
   // ── Render items list ───────────────────────────────────────
-  function renderItems(): void {
-    const count = items.length;
-    itemCount.textContent = count === 1 ? `1 ${t('schedule.item.count_one')}` : `${count} ${t('schedule.item.count_many')}`;
+  function renderActivityCards(): void {
+    const count = activityCards.length;
+    itemCount.textContent = count === 1 ? `1 ${t('schedule.activity_card.count_one')}` : `${count} ${t('schedule.activity_card.count_many')}`;
 
     if (count === 0) {
       itemsList.innerHTML = `
         <div class="empty-state">
           <span class="empty-state__icon">📋</span>
-          <p>${t('schedule.item.empty')}</p>
+          <p>${t('schedule.activity_card.empty')}</p>
         </div>`;
       return;
     }
 
-    itemsList.innerHTML = items.map((item, idx) => `
+    itemsList.innerHTML = activityCards.map((item, idx) => `
       <div class="item-card card" data-id="${item.id}">
         <div class="item-card__reorder">
-          <button class="btn-icon js-up" data-id="${item.id}" ${idx === 0 ? 'disabled' : ''} title="${t('schedule.item.move_up')}">↑</button>
-          <button class="btn-icon js-down" data-id="${item.id}" ${idx === count - 1 ? 'disabled' : ''} title="${t('schedule.item.move_down')}">↓</button>
+          <button class="btn-icon js-up" data-id="${item.id}" ${idx === 0 ? 'disabled' : ''} title="${t('schedule.activity_card.move_up')}">↑</button>
+          <button class="btn-icon js-down" data-id="${item.id}" ${idx === count - 1 ? 'disabled' : ''} title="${t('schedule.activity_card.move_down')}">↓</button>
         </div>
         <div class="item-card__body">
           <div class="item-card__head">
@@ -421,7 +430,7 @@ export async function render(container: HTMLElement): Promise<void> {
     itemsList.querySelectorAll<HTMLButtonElement>('.js-down').forEach((btn) =>
       btn.addEventListener('click', () => move(btn.dataset['id']!, 1)));
     itemsList.querySelectorAll<HTMLButtonElement>('.js-item-edit').forEach((btn) => {
-      const item = items.find((x) => x.id === btn.dataset['id'])!;
+      const item = activityCards.find((x) => x.id === btn.dataset['id'])!;
       btn.addEventListener('click', () => openEdit(item));
     });
     itemsList.querySelectorAll<HTMLButtonElement>('.js-item-delete').forEach((btn) =>
@@ -430,7 +439,7 @@ export async function render(container: HTMLElement): Promise<void> {
 
   // ── Modal helpers ───────────────────────────────────────────
   function openAdd(): void {
-    container.querySelector<HTMLElement>('#item-modal-title')!.textContent = t('schedule.item.new');
+    container.querySelector<HTMLElement>('#item-modal-title')!.textContent = t('schedule.activity_card.new');
     itemForm.reset();
     itemForm.querySelector<HTMLInputElement>('#item-id')!.value = '';
     pictSearchInput.value = '';
@@ -444,8 +453,8 @@ export async function render(container: HTMLElement): Promise<void> {
     itemForm.querySelector<HTMLInputElement>('#item-title')!.focus();
   }
 
-  function openEdit(item: ScheduleItem): void {
-    container.querySelector<HTMLElement>('#item-modal-title')!.textContent = t('schedule.item.edit');
+  function openEdit(item: ActivityCard): void {
+    container.querySelector<HTMLElement>('#item-modal-title')!.textContent = t('schedule.activity_card.edit');
     itemForm.querySelector<HTMLInputElement>('#item-id')!.value = item.id;
     itemForm.querySelector<HTMLInputElement>('#item-title')!.value = item.title;
     itemForm.querySelector<HTMLTextAreaElement>('#item-desc')!.value = item.description ?? '';
@@ -484,11 +493,11 @@ export async function render(container: HTMLElement): Promise<void> {
     const submitBtn  = itemForm.querySelector<HTMLButtonElement>('button[type="submit"]')!;
 
     if (!start_time) {
-      itemError.textContent = t('schedule.item.invalid_start_time');
+      itemError.textContent = t('schedule.activity_card.invalid_start_time');
       return;
     }
     if (endRaw.trim() && !end_time) {
-      itemError.textContent = t('schedule.item.invalid_end_time');
+      itemError.textContent = t('schedule.activity_card.invalid_end_time');
       return;
     }
 
@@ -496,9 +505,9 @@ export async function render(container: HTMLElement): Promise<void> {
     itemError.textContent = '';
     try {
       if (id) {
-        await api.put(`/schedules/${scheduleId}/items/${id}`, { title, description, picture_path, start_time, end_time });
+        await api.put(`/schedules/${scheduleId}/activity-cards/${id}`, { title, description, picture_path, start_time, end_time });
       } else {
-        await api.post(`/schedules/${scheduleId}/items`, { title, description, picture_path, start_time, end_time });
+        await api.post(`/schedules/${scheduleId}/activity-cards`, { title, description, picture_path, start_time, end_time });
       }
       closeItemModal();
       await load();
@@ -516,7 +525,7 @@ export async function render(container: HTMLElement): Promise<void> {
     deleteErrorEl.textContent = '';
     btn.disabled = true;
     try {
-      await api.delete(`/schedules/${scheduleId}/items/${pendingDeleteId}`);
+      await api.delete(`/schedules/${scheduleId}/activity-cards/${pendingDeleteId}`);
       closeDeleteModal();
       await load();
     } catch {
@@ -527,21 +536,21 @@ export async function render(container: HTMLElement): Promise<void> {
 
   // ── Reorder (up / down) ─────────────────────────────────────
   async function move(itemId: string, direction: -1 | 1): Promise<void> {
-    const idx = items.findIndex((x) => x.id === itemId);
+    const idx = activityCards.findIndex((x) => x.id === itemId);
     if (idx < 0) return;
     const swapIdx = idx + direction;
-    if (swapIdx < 0 || swapIdx >= items.length) return;
+    if (swapIdx < 0 || swapIdx >= activityCards.length) return;
 
     // Swap locally for instant UI feedback
-    const tmp = items[idx]!;
-    items[idx] = items[swapIdx]!;
-    items[swapIdx] = tmp;
-    renderItems();
+    const tmp = activityCards[idx]!;
+    activityCards[idx] = activityCards[swapIdx]!;
+    activityCards[swapIdx] = tmp;
+    renderActivityCards();
 
     // Persist new order
     try {
-      await api.patch(`/schedules/${scheduleId}/items/reorder`, {
-        item_ids: items.map((x) => x.id),
+      await api.patch(`/schedules/${scheduleId}/activity-cards/reorder`, {
+        activity_card_ids: activityCards.map((x) => x.id),
       });
     } catch {
       // Rollback and reload on error
@@ -550,7 +559,7 @@ export async function render(container: HTMLElement): Promise<void> {
   }
 
   // ── Event listeners ─────────────────────────────────────────
-  container.querySelector('#btn-back')?.addEventListener('click', () => router.push('/schedules'));
+  container.querySelector('#btn-back')?.addEventListener('click', () => router.push('/weeklyschedule'));
   container.querySelector('#btn-print')?.addEventListener('click', () => printSchedule());
   container.querySelector('#btn-add-item')?.addEventListener('click', openAdd);
 

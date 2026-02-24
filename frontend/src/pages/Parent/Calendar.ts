@@ -8,7 +8,15 @@ import { formatClockRangeForUser, formatIsoDateForUser, getUserLocale, getUserWe
 // ── Types ────────────────────────────────────────────────────
 
 interface Child { id: string; display_name: string; }
-interface Schedule { id: string; name: string; status: string; item_count?: number; }
+interface WeeklySchedule {
+  id: string;
+  child_id: string | null;
+  name: string;
+  description: string | null;
+  status: 'active' | 'inactive' | 'archived';
+  used_by_children: string[];
+  activity_card_count: number;
+}
 interface WeekResponse {
   year: number; week: number; monday: string;
   days: {
@@ -16,9 +24,15 @@ interface WeekResponse {
     assignment_id: string | null;
     schedule_id: string | null;
     schedule_name: string | null;
-    items: ScheduleItemData[];
+    activity_cards: ScheduleItemData[];
   }[];
 }
+
+const STATUS_CLASS: Record<WeeklySchedule['status'], string> = {
+  active: 'badge-active',
+  inactive: 'badge-inactive',
+  archived: 'badge-archived',
+};
 
 // ── ISO week helpers ─────────────────────────────────────────
 
@@ -40,6 +54,7 @@ export async function render(container: HTMLElement): Promise<void> {
   const today = new Date();
   let week = getISOWeek(today);
   let year = today.getFullYear();
+  let visibleDays: 5 | 7 = (localStorage.getItem('calendar.visibleDays') === '5' ? 5 : 7);
   const use24hInput = (session.user?.time_format ?? '24h') === '24h';
   const timeInputAttrs = use24hInput
     ? 'type="text" inputmode="numeric" pattern="^([01]\\d|2[0-3]):[0-5]\\d$" placeholder="HH:MM"'
@@ -52,8 +67,27 @@ export async function render(container: HTMLElement): Promise<void> {
         <div class="calendar-header-controls">
           <span id="single-child-name" class="badge hidden" aria-live="polite"></span>
           <select id="child-select" class="child-select"><option value="">${t('calendar.select_child')}</option></select>
+          <label class="calendar-days-mode" for="week-visible-days">
+            <span>${t('calendar.visible_days')}</span>
+            <select id="week-visible-days" class="child-select">
+              <option value="5" ${visibleDays === 5 ? 'selected' : ''}>${t('calendar.visible_days_5')}</option>
+              <option value="7" ${visibleDays === 7 ? 'selected' : ''}>${t('calendar.visible_days_7')}</option>
+            </select>
+          </label>
         </div>
       </div>
+
+      <section class="card weekly-schedules">
+        <div class="weekly-schedules__head">
+          <h2>${t('nav.weekly_schedule')}</h2>
+          <div class="weekly-schedules-header-actions">
+            <a class="btn btn-secondary btn-sm" href="/templates">${t('schedule.template_browser')}</a>
+            <button class="btn btn-primary btn-sm" id="btn-new-schedule">+ ${t('calendar.new_weekly_schedule')}</button>
+          </div>
+        </div>
+        <div id="calendar-schedule-list" class="schedule-list"></div>
+      </section>
+
       <div id="week-wrap" class="week-view-wrap">
         <div class="empty-state">
           <span class="empty-state__icon">📅</span>
@@ -62,14 +96,14 @@ export async function render(container: HTMLElement): Promise<void> {
       </div>
     </main>
 
-    <!-- Assign schedule modal -->
+    <!-- Assign weekly schedule modal -->
     <div class="modal-backdrop hidden" id="assign-modal">
       <dialog class="modal" open role="dialog" aria-modal="true" aria-labelledby="assign-modal-title">
-        <h2 id="assign-modal-title">${t('calendar.assign')}</h2>
+        <h2 id="assign-modal-title">${t('calendar.assign_weekly_schedule')}</h2>
         <div class="form-stack calendar-assign-form">
           <input type="hidden" id="assign-dow" />
           <div>
-            <label for="assign-select">Schedule</label>
+            <label for="assign-select">${t('calendar.weekly_schedule_label')}</label>
             <select id="assign-select"></select>
           </div>
           <label class="calendar-persistent-row">
@@ -88,10 +122,37 @@ export async function render(container: HTMLElement): Promise<void> {
           </div>
           <div class="modal-actions">
             <button type="button" class="btn btn-secondary" id="btn-assign-cancel">${t('schedule.cancel')}</button>
-            <button type="button" class="btn btn-primary" id="btn-assign-confirm">${t('calendar.assign')}</button>
+            <button type="button" class="btn btn-primary" id="btn-assign-confirm">${t('calendar.assign_weekly_schedule')}</button>
           </div>
           <p id="assign-error" class="error-msg" aria-live="polite"></p>
         </div>
+      </dialog>
+    </div>
+
+    <!-- Weekly schedule create/edit modal -->
+    <div class="modal-backdrop hidden" id="schedule-modal">
+      <dialog class="modal" open role="dialog" aria-modal="true" aria-labelledby="schedule-modal-title">
+        <h2 id="schedule-modal-title">${t('calendar.new_weekly_schedule')}</h2>
+        <form id="schedule-form" class="form-stack weekly-schedule-form">
+          <input type="hidden" id="schedule-id" />
+          <div>
+            <label for="schedule-title">${t('schedule.title')}</label>
+            <input id="schedule-title" type="text" required />
+          </div>
+          <div>
+            <label for="schedule-desc">${t('schedule.description')}</label>
+            <textarea id="schedule-desc" rows="3"></textarea>
+          </div>
+          <div>
+            <label for="schedule-child">${t('calendar.assign_child')}</label>
+            <select id="schedule-child"><option value="">${t('calendar.none')}</option></select>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="btn-schedule-cancel">${t('schedule.cancel')}</button>
+            <button type="submit" class="btn btn-primary">${t('schedule.save')}</button>
+          </div>
+          <p id="schedule-error" class="error-msg" aria-live="polite"></p>
+        </form>
       </dialog>
     </div>
 
@@ -109,7 +170,7 @@ export async function render(container: HTMLElement): Promise<void> {
     <!-- Item edit modal -->
     <div class="modal-backdrop hidden" id="item-modal">
       <dialog class="modal" open role="dialog" aria-modal="true" aria-labelledby="item-modal-title">
-        <h2 id="item-modal-title">${t('schedule.item.edit')}</h2>
+        <h2 id="item-modal-title">${t('schedule.activity_card.edit')}</h2>
         <div class="form-stack calendar-item-form">
           <input type="hidden" id="item-edit-schedule-id" />
           <input type="hidden" id="item-edit-item-id" />
@@ -146,11 +207,16 @@ export async function render(container: HTMLElement): Promise<void> {
 
   // ── DOM refs ────────────────────────────────────────────────
   const childSelect = container.querySelector<HTMLSelectElement>('#child-select')!;
+  const weekVisibleDays = container.querySelector<HTMLSelectElement>('#week-visible-days')!;
   const singleChildName = container.querySelector<HTMLElement>('#single-child-name')!;
+  const weeklyScheduleListEl = container.querySelector<HTMLElement>('#calendar-schedule-list')!;
   const wrap        = container.querySelector<HTMLElement>('#week-wrap')!;
   const assignModal = container.querySelector<HTMLElement>('#assign-modal')!;
   const dayModal    = container.querySelector<HTMLElement>('#day-modal')!;
   const itemModal   = container.querySelector<HTMLElement>('#item-modal')!;
+  const weeklyScheduleModal = container.querySelector<HTMLElement>('#schedule-modal')!;
+  const weeklyScheduleForm = container.querySelector<HTMLFormElement>('#schedule-form')!;
+  const weeklyScheduleError = container.querySelector<HTMLParagraphElement>('#schedule-error')!;
   const assignDowEl = container.querySelector<HTMLInputElement>('#assign-dow')!;
   const assignSel   = container.querySelector<HTMLSelectElement>('#assign-select')!;
   const assignPersistentEl = container.querySelector<HTMLInputElement>('#assign-persistent')!;
@@ -180,7 +246,8 @@ export async function render(container: HTMLElement): Promise<void> {
   assignStartEl.setAttribute('lang', datePickerLocale);
   assignEndEl.setAttribute('lang', datePickerLocale);
 
-  let schedules: Schedule[] = [];
+  let weeklySchedules: WeeklySchedule[] = [];
+  let children: Child[] = [];
   const todayStr = isoDate(today);
   let loadedInitialWeek = false;
   let currentDays: WeekDay[] = [];
@@ -216,11 +283,13 @@ export async function render(container: HTMLElement): Promise<void> {
 
   // ── Load children ───────────────────────────────────────────
   try {
-    const children = await api.get<Child[]>('/children');
+    children = await api.get<Child[]>('/children');
     children.forEach((c) => {
       const o = document.createElement('option');
       o.value = c.id; o.textContent = c.display_name;
       childSelect.appendChild(o);
+      container.querySelector<HTMLSelectElement>('#schedule-child')
+        ?.insertAdjacentHTML('beforeend', `<option value="${c.id}">${escapeHtml(c.display_name)}</option>`);
     });
 
     if (children.length === 1) {
@@ -243,13 +312,138 @@ export async function render(container: HTMLElement): Promise<void> {
   } catch { /* non-fatal */ }
 
   // ── Load schedules (for assign dropdown) ───────────────────
-  async function loadSchedules(): Promise<void> {
+  // ── Load weekly schedules (for assign dropdown) ─────────────
+  async function loadWeeklySchedules(): Promise<void> {
     try {
-      const all = await api.get<Schedule[]>('/schedules');
-      // Keep all non-archived schedules; backend enforces "must have items" on assignment.
-      // This avoids stale item_count values causing a no-op assignment modal.
-      schedules = all.filter((s) => s.status !== 'archived');
-    } catch { schedules = []; }
+      weeklySchedules = await api.get<WeeklySchedule[]>('/schedules');
+      renderWeeklyScheduleList();
+    } catch {
+      weeklySchedules = [];
+      weeklyScheduleListEl.innerHTML = `<p class="error-msg">${t('errors.generic')}</p>`;
+    }
+  }
+
+  function renderWeeklyScheduleList(): void {
+    if (weeklySchedules.length === 0) {
+      weeklyScheduleListEl.innerHTML = `<div class="empty-state"><p>${t('calendar.no_weekly_schedules_yet')}</p></div>`;
+      return;
+    }
+
+    weeklyScheduleListEl.innerHTML = weeklySchedules.map((s) => `
+      <div class="schedule-card card" data-id="${s.id}">
+        <div class="schedule-card__head">
+          <div>
+            <h3>${escapeHtml(s.name)}</h3>
+            ${s.description ? `<p class="weekly-schedule-card-desc">${escapeHtml(s.description)}</p>` : ''}
+            <p class="weekly-schedule-card-usedby">
+              ${t('calendar.used_by')}: ${s.used_by_children.length > 0 ? s.used_by_children.join(', ') : t('calendar.no_children_yet')}
+            </p>
+          </div>
+          ${s.status === 'inactive' ? '' : `<span class="badge ${STATUS_CLASS[s.status]}">${t(`schedule.status.${s.status}`)}</span>`}
+        </div>
+        <div class="schedule-card__actions">
+          <a class="btn btn-primary btn-sm" href="/weeklyschedule/${s.id}">${t('schedule.edit_activity_cards')}</a>
+          <button class="btn btn-secondary btn-sm js-schedule-edit" data-id="${s.id}">${t('schedule.edit')}</button>
+          <button class="btn btn-secondary btn-sm js-schedule-archive" data-id="${s.id}" data-status="${s.status}">
+            ${s.status === 'archived' ? t('schedule.restore') : t('schedule.archive')}
+          </button>
+          <button class="btn btn-secondary btn-sm js-schedule-delete" data-id="${s.id}">${t('schedule.delete')}</button>
+        </div>
+      </div>
+    `).join('');
+
+    weeklyScheduleListEl.querySelectorAll<HTMLButtonElement>('.js-schedule-edit').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const s = weeklySchedules.find((x) => x.id === btn.dataset['id']);
+        if (!s) return;
+        openEditWeeklyScheduleModal(s);
+      });
+    });
+
+    weeklyScheduleListEl.querySelectorAll<HTMLButtonElement>('.js-schedule-archive').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset['id'];
+        const status = btn.dataset['status'] as WeeklySchedule['status'] | undefined;
+        if (!id || !status) return;
+        void toggleWeeklyScheduleArchive(id, status);
+      });
+    });
+
+    weeklyScheduleListEl.querySelectorAll<HTMLButtonElement>('.js-schedule-delete').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset['id'];
+        if (!id) return;
+        void deleteWeeklySchedule(id);
+      });
+    });
+  }
+
+  function openCreateWeeklyScheduleModal(): void {
+    container.querySelector<HTMLElement>('#schedule-modal-title')!.textContent = t('calendar.new_weekly_schedule');
+    weeklyScheduleForm.reset();
+    weeklyScheduleForm.querySelector<HTMLInputElement>('#schedule-id')!.value = '';
+    weeklyScheduleForm.querySelector<HTMLSelectElement>('#schedule-child')!.value = '';
+    weeklyScheduleError.textContent = '';
+    weeklyScheduleModal.classList.remove('hidden');
+  }
+
+  function openEditWeeklyScheduleModal(schedule: WeeklySchedule): void {
+    container.querySelector<HTMLElement>('#schedule-modal-title')!.textContent = t('calendar.edit_weekly_schedule');
+    weeklyScheduleForm.querySelector<HTMLInputElement>('#schedule-id')!.value = schedule.id;
+    weeklyScheduleForm.querySelector<HTMLInputElement>('#schedule-title')!.value = schedule.name;
+    weeklyScheduleForm.querySelector<HTMLTextAreaElement>('#schedule-desc')!.value = schedule.description ?? '';
+    weeklyScheduleForm.querySelector<HTMLSelectElement>('#schedule-child')!.value = schedule.child_id ?? '';
+    weeklyScheduleError.textContent = '';
+    weeklyScheduleModal.classList.remove('hidden');
+  }
+
+  async function saveWeeklySchedule(): Promise<void> {
+    const id = weeklyScheduleForm.querySelector<HTMLInputElement>('#schedule-id')!.value;
+    const name = weeklyScheduleForm.querySelector<HTMLInputElement>('#schedule-title')!.value.trim();
+    const description = weeklyScheduleForm.querySelector<HTMLTextAreaElement>('#schedule-desc')!.value.trim();
+    const childId = weeklyScheduleForm.querySelector<HTMLSelectElement>('#schedule-child')!.value || null;
+
+    if (!name) {
+      weeklyScheduleError.textContent = t('calendar.title_required');
+      return;
+    }
+
+    const submitBtn = weeklyScheduleForm.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    submitBtn.disabled = true;
+    weeklyScheduleError.textContent = '';
+
+    try {
+      if (id) {
+        await api.put(`/schedules/${id}`, { name, description, child_id: childId });
+      } else {
+        await api.post('/schedules', { name, description, child_id: childId });
+      }
+      weeklyScheduleModal.classList.add('hidden');
+      await loadWeeklySchedules();
+    } catch (err) {
+      weeklyScheduleError.textContent = err instanceof ApiError ? err.message : t('errors.generic');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  }
+
+  async function toggleWeeklyScheduleArchive(id: string, status: WeeklySchedule['status']): Promise<void> {
+    try {
+      await api.patch(`/schedules/${id}/status`, { status: status === 'archived' ? 'active' : 'archived' });
+      await loadWeeklySchedules();
+    } catch {
+      weeklyScheduleError.textContent = t('errors.generic');
+    }
+  }
+
+  async function deleteWeeklySchedule(id: string): Promise<void> {
+    if (!window.confirm(t('calendar.delete_weekly_schedule_confirm'))) return;
+    try {
+      await api.delete(`/schedules/${id}`);
+      await loadWeeklySchedules();
+    } catch {
+      weeklyScheduleError.textContent = t('errors.generic');
+    }
   }
 
   // ── Load week data ──────────────────────────────────────────
@@ -266,11 +460,11 @@ export async function render(container: HTMLElement): Promise<void> {
         assignment_id: d.assignment_id,
         schedule_id:   d.schedule_id,
         schedule_name: d.schedule_name,
-        items:         d.items,
+        activity_cards: d.activity_cards,
       }));
       currentDays = days;
 
-      renderWeekView(wrap, days, week, year, false, getUserWeekStart());
+      renderWeekView(wrap, days, week, year, false, getUserWeekStart(), visibleDays);
 
       // Highlight today
       wrap.querySelectorAll<HTMLElement>('.week-grid__day').forEach((col) => {
@@ -335,18 +529,19 @@ export async function render(container: HTMLElement): Promise<void> {
 
   // ── Assign modal ────────────────────────────────────────────
   async function openAssignModal(dow: number, date: string): Promise<void> {
-    if (schedules.length === 0) await loadSchedules();
+    if (weeklySchedules.length === 0) await loadWeeklySchedules();
     assignDowEl.value = String(dow);
-    assignSel.innerHTML = schedules.length === 0
-      ? `<option value="">${t('calendar.no_active_schedules')}</option>`
-      : schedules.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+    const assignable = weeklySchedules.filter((s) => s.status !== 'archived');
+    assignSel.innerHTML = assignable.length === 0
+      ? `<option value="">${t('calendar.no_active_weekly_schedules')}</option>`
+      : assignable.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
     const defaultDate = /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : isoDate(new Date());
     assignPersistentEl.checked = true;
     assignStartEl.value = defaultDate;
     assignEndEl.value = defaultDate;
     toggleAssignRangeInputs();
     assignError.textContent = '';
-    assignConfirmBtn.disabled = schedules.length === 0;
+    assignConfirmBtn.disabled = assignable.length === 0;
     assignModal.classList.remove('hidden');
   }
 
@@ -364,7 +559,7 @@ export async function render(container: HTMLElement): Promise<void> {
     const scheduleId = assignSel.value;
     const dow = Number.parseInt(assignDowEl.value, 10);
     if (!scheduleId) {
-      assignError.textContent = t('calendar.select_schedule_required');
+      assignError.textContent = t('calendar.select_weekly_schedule_required');
       return;
     }
     if (!Number.isInteger(dow) || dow < 1 || dow > 7) {
@@ -408,7 +603,7 @@ export async function render(container: HTMLElement): Promise<void> {
     const day = currentDays.find((d) => d.date === datetime);
     if (!day?.schedule_id) return;
 
-    const item = day.items.find((i) => i.id === itemId);
+    const item = day.activity_cards.find((i) => i.id === itemId);
     if (!item) return;
 
     itemEditScheduleIdEl.value = day.schedule_id;
@@ -453,7 +648,7 @@ export async function render(container: HTMLElement): Promise<void> {
       if (end) {
         payload['end_time'] = end;
       }
-      await api.put(`/schedules/${scheduleId}/items/${itemId}`, payload);
+      await api.put(`/schedules/${scheduleId}/activity-cards/${itemId}`, payload);
       itemModal.classList.add('hidden');
       await loadWeek();
     } catch (err) {
@@ -472,7 +667,7 @@ export async function render(container: HTMLElement): Promise<void> {
     itemDeleteBtn.disabled = true;
     itemEditErrorEl.textContent = '';
     try {
-      await api.delete(`/schedules/${scheduleId}/items/${itemId}`);
+      await api.delete(`/schedules/${scheduleId}/activity-cards/${itemId}`);
       itemModal.classList.add('hidden');
       await loadWeek();
     } catch (err) {
@@ -487,9 +682,9 @@ export async function render(container: HTMLElement): Promise<void> {
     container.querySelector<HTMLElement>('#day-modal-title')!.textContent =
       `${day.schedule_name ?? t('calendar.no_schedule')} — ${formatIsoDateForUser(day.date)}`;
     const body = container.querySelector<HTMLElement>('#day-modal-body')!;
-    body.innerHTML = day.items.length === 0
-      ? `<p class="calendar-day-empty">${t('calendar.no_items')}</p>`
-      : day.items.map((item) => `
+    body.innerHTML = day.activity_cards.length === 0
+      ? `<p class="calendar-day-empty">${t('calendar.no_activity_cards')}</p>`
+      : day.activity_cards.map((item) => `
           <div class="item-card card calendar-day-item">
             <div class="item-card__body">
               <div class="item-card__head">
@@ -510,8 +705,23 @@ export async function render(container: HTMLElement): Promise<void> {
   });
 
   childSelect.addEventListener('change', loadWeek);
+  weekVisibleDays.addEventListener('change', () => {
+    visibleDays = weekVisibleDays.value === '5' ? 5 : 7;
+    localStorage.setItem('calendar.visibleDays', String(visibleDays));
+    void loadWeek();
+  });
 
-  // Pre-load schedules in background
-  loadSchedules();
+  container.querySelector('#btn-new-schedule')?.addEventListener('click', openCreateWeeklyScheduleModal);
+  container.querySelector('#btn-schedule-cancel')?.addEventListener('click', () => weeklyScheduleModal.classList.add('hidden'));
+  weeklyScheduleForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void saveWeeklySchedule();
+  });
+  weeklyScheduleModal.addEventListener('click', (event) => {
+    if (event.target === weeklyScheduleModal) weeklyScheduleModal.classList.add('hidden');
+  });
+
+  // Pre-load weekly schedules in background
+  void loadWeeklySchedules();
 }
 

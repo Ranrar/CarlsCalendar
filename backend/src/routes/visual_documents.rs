@@ -17,17 +17,17 @@ use crate::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/visual-documents/templates", get(list_templates).post(create_template))
-    .route("/visual-documents/templates/{id}", put(update_template).delete(delete_template))
+        .route("/visual-documents/templates/{id}", put(update_template).delete(delete_template))
+        .route("/visual-documents/templates/{id}/preview", get(preview_template_document))
         .route("/visual-documents/templates/{id}/copy", post(copy_template_to_document))
         .route("/visual-documents/activity-cards", get(list_activity_cards).post(create_activity_card))
-        .route("/visual-documents/activity-cards/{id}", axum::routing::delete(delete_activity_card))
+        .route("/visual-documents/activity-cards/{id}", put(update_activity_card).delete(delete_activity_card))
         .route("/visual-documents", get(list_documents).post(create_document))
         .route("/visual-documents/{id}", get(get_document).put(update_document).delete(delete_document))
 }
 
 const ALLOWED_DOCUMENT_TYPES: &[&str] = &[
     "DAILY_SCHEDULE",
-    "WEEKLY_SCHEDULE",
     "FIRST_THEN",
     "CHOICE_BOARD",
     "ROUTINE_STEPS",
@@ -122,6 +122,16 @@ struct DocumentDto {
 }
 
 #[derive(Serialize)]
+struct TemplatePreviewDto {
+    template_id: String,
+    title: String,
+    document_type: String,
+    locale: String,
+    layout_spec: serde_json::Value,
+    content: serde_json::Value,
+}
+
+#[derive(Serialize)]
 struct ActivityCardDto {
     id: String,
     owner_id: Option<String>,
@@ -205,6 +215,14 @@ struct UpdateDocumentBody {
 #[derive(Deserialize)]
 struct CreateActivityCardBody {
     label: String,
+    locale: Option<String>,
+    pictogram_id: Option<String>,
+    category: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct UpdateActivityCardBody {
+    label: Option<String>,
     locale: Option<String>,
     pictogram_id: Option<String>,
     category: Option<String>,
@@ -760,42 +778,7 @@ async fn copy_template_to_document(
     let template_layout = extract_layout_spec(&template_metadata);
     validate_layout_for_type(&template.document_type, &template_layout)?;
 
-    let activity_rows: Vec<TemplateActivityRow> = sqlx::query_as::<_, TemplateActivityRow>(
-        "SELECT
-            ta.activity_order,
-            COALESCE(al.id, CONCAT('activity-', ta.activity_order)) AS activity_id,
-            COALESCE(NULLIF(ta.text_label, ''), al.label_text, CONCAT('Step ', ta.activity_order)) AS label,
-            al.local_image_path AS pictogram_url
-         FROM visual_support_template_activities ta
-         LEFT JOIN visual_support_activity_library al ON al.id = ta.activity_card_id
-         WHERE ta.template_id = ?
-         ORDER BY ta.activity_order ASC",
-    )
-    .bind(&id)
-    .fetch_all(&state.pool)
-    .await?;
-
-    let expected_slots = extract_slot_count(&template_layout).unwrap_or(0);
-    let slot_count = if expected_slots > 0 {
-        expected_slots as usize
-    } else {
-        activity_rows.len()
-    };
-
-    let mut slots = vec![serde_json::Value::Null; slot_count];
-    for row in &activity_rows {
-        let idx = (row.activity_order - 1).max(0) as usize;
-        if idx >= slots.len() {
-            continue;
-        }
-        slots[idx] = serde_json::json!({
-            "id": row.activity_id,
-            "label": row.label,
-            "pictogramUrl": row.pictogram_url
-        });
-    }
-
-    let initial_content = serde_json::json!({ "slots": slots });
+    let initial_content = build_template_initial_content(&state.pool, &id, &template_layout).await?;
     let initial_content_json = serde_json::to_string(&initial_content)
         .map_err(|_| AppError::BadRequest("Invalid initial content JSON".into()))?;
 
@@ -832,6 +815,93 @@ async fn copy_template_to_document(
     .await?;
 
     Ok((StatusCode::CREATED, Json(to_document_dto(row))))
+}
+
+async fn build_template_initial_content(
+    pool: &crate::db::Db,
+    template_id: &str,
+    template_layout: &serde_json::Value,
+) -> AppResult<serde_json::Value> {
+    let activity_rows: Vec<TemplateActivityRow> = sqlx::query_as::<_, TemplateActivityRow>(
+        "SELECT
+            ta.activity_order,
+            COALESCE(al.id, CONCAT('activity-', ta.activity_order)) AS activity_id,
+            COALESCE(NULLIF(ta.text_label, ''), al.label_text, CONCAT('Step ', ta.activity_order)) AS label,
+            al.local_image_path AS pictogram_url
+         FROM visual_support_template_activities ta
+         LEFT JOIN visual_support_activity_library al ON al.id = ta.activity_card_id
+         WHERE ta.template_id = ?
+         ORDER BY ta.activity_order ASC",
+    )
+    .bind(template_id)
+    .fetch_all(pool)
+    .await?;
+
+    let expected_slots = extract_slot_count(template_layout).unwrap_or(0);
+    let slot_count = if expected_slots > 0 {
+        expected_slots as usize
+    } else {
+        activity_rows.len()
+    };
+
+    let mut slots = vec![serde_json::Value::Null; slot_count];
+    for row in &activity_rows {
+        let idx = (row.activity_order - 1).max(0) as usize;
+        if idx >= slots.len() {
+            continue;
+        }
+        slots[idx] = serde_json::json!({
+            "id": row.activity_id,
+            "label": row.label,
+            "pictogramUrl": row.pictogram_url
+        });
+    }
+
+    Ok(serde_json::json!({ "slots": slots }))
+}
+
+async fn preview_template_document(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(id): Path<String>,
+) -> AppResult<Json<TemplatePreviewDto>> {
+    if user.role == UserRole::Child {
+        return Err(AppError::Forbidden);
+    }
+
+    let template: TemplateRow = sqlx::query_as::<_, TemplateRow>(
+        "SELECT id, owner_id, name, description, document_type, scenario_type, language, is_system, metadata_json, created_at, updated_at
+         FROM visual_support_documents_templates
+         WHERE id = ?",
+    )
+    .bind(&id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    let can_use = if user.role == UserRole::Admin {
+        true
+    } else {
+        template.is_system || template.owner_id.as_deref() == Some(&user.user_id)
+    };
+    if !can_use {
+        return Err(AppError::Forbidden);
+    }
+
+    let template_metadata = parse_json_safe_bytes(&template.metadata_json);
+    let template_layout = extract_layout_spec(&template_metadata);
+    validate_layout_for_type(&template.document_type, &template_layout)?;
+
+    let content = build_template_initial_content(&state.pool, &id, &template_layout).await?;
+
+    Ok(Json(TemplatePreviewDto {
+        template_id: template.id,
+        title: template.name,
+        document_type: template.document_type,
+        locale: template.language,
+        layout_spec: template_layout,
+        content,
+    }))
 }
 
 async fn list_activity_cards(
@@ -969,6 +1039,105 @@ async fn delete_activity_card(
         .await?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn update_activity_card(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(id): Path<String>,
+    Json(body): Json<UpdateActivityCardBody>,
+) -> AppResult<Json<ActivityCardDto>> {
+    if user.role == UserRole::Child {
+        return Err(AppError::Forbidden);
+    }
+
+    let existing: ActivityCardRow = sqlx::query_as::<_, ActivityCardRow>(
+        "SELECT id, owner_id, language, label_text, pictogram_id, arasaac_id, local_image_path, category, is_system, created_at, updated_at
+         FROM visual_support_activity_library
+         WHERE id = ?",
+    )
+    .bind(&id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    if existing.is_system {
+        return Err(AppError::Conflict("Default activity cards cannot be edited".into()));
+    }
+
+    if user.role != UserRole::Admin && existing.owner_id.as_deref() != Some(&user.user_id) {
+        return Err(AppError::Forbidden);
+    }
+
+    let label = body
+        .label
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(str::to_string)
+        .unwrap_or(existing.label_text.clone());
+
+    if label.trim().is_empty() {
+        return Err(AppError::BadRequest("Activity card label is required".into()));
+    }
+
+    let locale = body.locale.unwrap_or(existing.language.clone());
+
+    // If pictogram_id is present but empty, treat as clear.
+    let pictogram_id = match body.pictogram_id {
+        Some(value) if value.trim().is_empty() => None,
+        Some(value) => Some(value),
+        None => existing.pictogram_id.clone(),
+    };
+
+    let arasaac_id = pictogram_id
+        .as_deref()
+        .and_then(|value| value.parse::<i32>().ok());
+
+    let local_image_path: Option<String> = if let Some(arasaac_id) = arasaac_id {
+        sqlx::query_scalar::<_, String>(
+            "SELECT local_file_path FROM pictograms WHERE arasaac_id = ? LIMIT 1",
+        )
+        .bind(arasaac_id)
+        .fetch_optional(&state.pool)
+        .await?
+    } else {
+        None
+    };
+
+    let category = body.category.or(existing.category.clone());
+
+    sqlx::query(
+        "UPDATE visual_support_activity_library
+         SET language = ?, label_text = ?, pictogram_id = ?, arasaac_id = ?, local_image_path = ?, category = ?
+         WHERE id = ?",
+    )
+    .bind(&locale)
+    .bind(&label)
+    .bind(&pictogram_id)
+    .bind(arasaac_id)
+    .bind(local_image_path)
+    .bind(category)
+    .bind(&id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| match &e {
+        sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("23000") => {
+            AppError::Conflict("Activity card already exists for this locale".into())
+        }
+        _ => AppError::from(e),
+    })?;
+
+    let row: ActivityCardRow = sqlx::query_as::<_, ActivityCardRow>(
+        "SELECT id, owner_id, language, label_text, pictogram_id, arasaac_id, local_image_path, category, is_system, created_at, updated_at
+         FROM visual_support_activity_library
+         WHERE id = ?",
+    )
+    .bind(&id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    Ok(Json(to_activity_card_dto(row)))
 }
 
 async fn list_documents(

@@ -96,7 +96,7 @@ export async function render(container: HTMLElement): Promise<void> {
                 </td>
                 <td style="display:flex;gap:.375rem;flex-wrap:wrap">
                   <button class="btn btn-secondary btn-sm js-rename" data-id="${t.id}" ${t.status === 'archived' ? 'disabled' : ''}>Save name</button>
-                  <a class="btn btn-secondary btn-sm ${t.status === 'archived' ? 'disabled' : ''}" href="/schedules/${t.id}" ${t.status === 'archived' ? 'tabindex="-1" aria-disabled="true"' : ''}>Edit items</a>
+                  <a class="btn btn-secondary btn-sm ${t.status === 'archived' ? 'disabled' : ''}" href="/weeklyschedule/${t.id}" ${t.status === 'archived' ? 'tabindex="-1" aria-disabled="true"' : ''}>Edit items</a>
                   ${t.status !== 'archived'
                     ? `<button class="btn btn-secondary btn-sm js-archive" data-id="${t.id}">Archive</button>`
                     : ''}

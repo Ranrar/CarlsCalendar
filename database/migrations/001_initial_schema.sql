@@ -36,57 +36,6 @@ CREATE TABLE IF NOT EXISTS child_profiles (
     INDEX idx_child_profiles_parent_id (parent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS schedules (
-    id                 CHAR(36) NOT NULL PRIMARY KEY,
-    owner_id           CHAR(36) NOT NULL,
-    child_id           CHAR(36) NULL,
-    name               VARCHAR(200) NOT NULL,
-    status             ENUM('active','inactive','archived') NOT NULL DEFAULT 'inactive',
-    is_template        BOOLEAN NOT NULL DEFAULT FALSE,
-    source_template_id CHAR(36) NULL,
-    created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_schedules_owner  FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT fk_schedules_child  FOREIGN KEY (child_id) REFERENCES child_profiles(id) ON DELETE SET NULL,
-    CONSTRAINT fk_schedules_source FOREIGN KEY (source_template_id) REFERENCES schedules(id) ON DELETE SET NULL,
-    INDEX idx_schedules_owner (owner_id),
-    INDEX idx_schedules_child (child_id),
-    INDEX idx_schedules_status (status),
-    INDEX idx_schedules_owner_template (owner_id, is_template)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS schedule_items (
-    id           CHAR(36) NOT NULL PRIMARY KEY,
-    schedule_id  CHAR(36) NOT NULL,
-    title        VARCHAR(200) NOT NULL,
-    description  TEXT NULL,
-    picture_path VARCHAR(500) NULL,
-    start_time   TIME NOT NULL,
-    end_time     TIME NULL,
-    sort_order   INT NOT NULL DEFAULT 0,
-    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_items_schedule FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
-    INDEX idx_items_schedule_order (schedule_id, sort_order, start_time)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS schedule_day_assignments (
-    id          CHAR(36) NOT NULL PRIMARY KEY,
-    schedule_id CHAR(36) NOT NULL,
-    child_id    CHAR(36) NOT NULL,
-    day_of_week TINYINT NOT NULL COMMENT '1=Monday, 7=Sunday (ISO 8601)',
-    start_date  DATE NULL,
-    end_date    DATE NULL,
-    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    UNIQUE KEY uq_assignment (schedule_id, child_id, day_of_week),
-
-    CONSTRAINT fk_assign_schedule FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
-    CONSTRAINT fk_assign_child    FOREIGN KEY (child_id) REFERENCES child_profiles(id) ON DELETE CASCADE,
-    INDEX idx_assign_child_day (child_id, day_of_week)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS qr_tokens (
     id         CHAR(36) NOT NULL PRIMARY KEY,
     child_id   CHAR(36) NOT NULL,
@@ -137,6 +86,23 @@ CREATE TABLE IF NOT EXISTS pictograms (
     INDEX idx_pictograms_category (category),
     FULLTEXT KEY ft_pictograms_search (keywords_text, categories_text, tags_text, description)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Persisted admin controls for idle pictogram prefetch worker.
+CREATE TABLE IF NOT EXISTS pictogram_prefetch_settings (
+    id                TINYINT NOT NULL PRIMARY KEY,
+    enabled           BOOLEAN NOT NULL DEFAULT FALSE,
+    idle_minutes      INT NOT NULL DEFAULT 20,
+    batch_size        INT NOT NULL DEFAULT 50,
+    last_run_at       DATETIME NULL,
+    last_result_json  JSON NULL,
+    created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO pictogram_prefetch_settings (id, enabled, idle_minutes, batch_size)
+VALUES (1, FALSE, 20, 50)
+ON DUPLICATE KEY UPDATE
+    id = VALUES(id);
 
 CREATE TABLE IF NOT EXISTS saved_pictograms (
     id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -342,7 +308,7 @@ CREATE TABLE IF NOT EXISTS visual_support_activity_library (
 
 CREATE TABLE IF NOT EXISTS visual_support_template_activities (
     id              CHAR(36) NOT NULL PRIMARY KEY,
-    template_id     CHAR(36) NOT NULL,
+    template_id     CHAR(36) NULL,
     activity_order  INT NOT NULL,
     activity_card_id CHAR(36) NULL,
     pictogram_id    VARCHAR(120) NULL,

@@ -1,6 +1,6 @@
 //! `/calendar` routes — weekly view and schedule day-assignment management.
 //!
-//! * `GET  /calendar/:child_id/week/:iso_week` — fetch the week's items for a child
+//! * `GET  /calendar/:child_id/week/:iso_week` — fetch the week's activity cards for a child
 //!   `:iso_week` format: `YYYY-Wnn`  (e.g. `2025-W07`)
 //! * `POST /calendar/:child_id/assign`          — assign a schedule to a weekday
 //! * `DELETE /calendar/:child_id/assign/:id`    — remove an assignment
@@ -23,6 +23,8 @@ use crate::{
     models::UserRole,
     state::AppState,
 };
+
+const WEEKLY_TYPE: &str = "WEEKLY_SCHEDULE";
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -48,8 +50,9 @@ struct AssignmentRow {
 }
 
 #[derive(sqlx::FromRow, Serialize, Clone)]
-struct ItemRow {
+struct ActivityCardRow {
     id:           String,
+    activity_card_id: Option<String>,
     title:        String,
     description:  Option<String>,
     picture_path: Option<String>,
@@ -65,7 +68,7 @@ struct DayView {
     assignment_id: Option<String>,
     schedule_id:   Option<String>,
     schedule_name: Option<String>,
-    items:         Vec<ItemRow>,
+    activity_cards: Vec<ActivityCardRow>,
 }
 
 #[derive(Serialize)]
@@ -198,15 +201,21 @@ async fn load_week_for_child(
         .ok_or_else(|| AppError::BadRequest("Invalid ISO week".into()))?;
 
     // Fetch assignments for this child and weekday.
-    let assignments: Vec<AssignmentRow> = sqlx::query_as::<_, AssignmentRow>(
-        "SELECT id, schedule_id, day_of_week,
-                DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
-                DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date
-         FROM schedule_day_assignments
-         WHERE child_id = ?
-         ORDER BY created_at DESC",
-    )
-    .bind(child_profile_id)
+        let assignments: Vec<AssignmentRow> = sqlx::query_as::<_, AssignmentRow>(
+                "SELECT
+                        d.id,
+                        d.template_id AS schedule_id,
+                        CAST(JSON_UNQUOTE(JSON_EXTRACT(d.content_json, '$.assignment.day_of_week')) AS SIGNED) AS day_of_week,
+                    CAST(NULLIF(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(d.content_json, '$.assignment.start_date')), ''), 'null') AS CHAR(10)) AS start_date,
+                    CAST(NULLIF(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(d.content_json, '$.assignment.end_date')), ''), 'null') AS CHAR(10)) AS end_date
+                 FROM visual_support_documents d
+                 WHERE d.child_id = ?
+                     AND d.document_type = ?
+                     AND d.template_id IS NOT NULL
+                 ORDER BY d.created_at DESC",
+        )
+        .bind(child_profile_id)
+        .bind(WEEKLY_TYPE)
     .fetch_all(pool).await?;
 
     let mut days: Vec<DayView> = Vec::new();
@@ -219,26 +228,42 @@ async fn load_week_for_child(
             .filter(|a| assignment_applies_to_date(a, &date_s))
             .max_by(|a, b| assignment_priority(a).cmp(&assignment_priority(b)));
 
-        let (assignment_id, schedule_id, schedule_name, items) = if let Some(a) = assignment {
-            #[derive(sqlx::FromRow)] struct NameRow { name: String }
+        let (assignment_id, schedule_id, schedule_name, activity_cards) = if let Some(a) = assignment {
+            #[derive(sqlx::FromRow)]
+            struct NameRow {
+                name: String,
+            }
             let s: Option<NameRow> = sqlx::query_as::<_, NameRow>(
-                "SELECT name FROM schedules WHERE id = ? AND status <> 'archived'",
+                "SELECT t.name
+                 FROM visual_support_documents_templates t
+                 WHERE t.id = ?
+                   AND t.document_type = ?
+                   AND COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.schedule.status')), ''), 'inactive') <> 'archived'",
             )
             .bind(&a.schedule_id)
+            .bind(WEEKLY_TYPE)
             .fetch_optional(pool).await?;
 
             if let Some(s) = s {
-                let items: Vec<ItemRow> = sqlx::query_as::<_, ItemRow>(
-                    "SELECT id, title, description, picture_path,
-                            TIME_FORMAT(start_time, '%H:%i') AS start_time,
-                            TIME_FORMAT(end_time,   '%H:%i') AS end_time,
-                            sort_order
-                     FROM schedule_items WHERE schedule_id = ? ORDER BY sort_order",
+                let activity_cards: Vec<ActivityCardRow> = sqlx::query_as::<_, ActivityCardRow>(
+                    "SELECT
+                        vta.id,
+                        vta.activity_card_id,
+                        COALESCE(NULLIF(vta.text_label, ''), vsa.label_text) AS title,
+                        vta.optional_notes AS description,
+                        CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(vta.metadata_json, '$.picture_path')), ''), vsa.local_image_path) AS CHAR(500)) AS picture_path,
+                        CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(vta.metadata_json, '$.start_time')), ''), '08:00') AS CHAR(5)) AS start_time,
+                        CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(vta.metadata_json, '$.end_time')), '') AS CHAR(5)) AS end_time,
+                        vta.activity_order AS sort_order
+                     FROM visual_support_template_activities vta
+                     LEFT JOIN visual_support_activity_library vsa ON vsa.id = vta.activity_card_id
+                     WHERE vta.template_id = ?
+                     ORDER BY vta.activity_order",
                 )
-                .bind(&a.schedule_id)
+                 .bind(&a.schedule_id)
                 .fetch_all(pool).await?;
 
-                (Some(a.id.clone()), Some(a.schedule_id.clone()), Some(s.name), items)
+                (Some(a.id.clone()), Some(a.schedule_id.clone()), Some(s.name), activity_cards)
             } else {
                 // Archived or missing schedules are hidden from child-facing reads.
                 (None, None, None, vec![])
@@ -253,7 +278,7 @@ async fn load_week_for_child(
             assignment_id,
             schedule_id,
             schedule_name,
-            items,
+            activity_cards,
         });
     }
 
@@ -275,16 +300,19 @@ async fn assign(
         return Err(AppError::BadRequest("day_of_week must be 1–7".into()));
     }
 
-    let (start_date, end_date): (Option<NaiveDate>, Option<NaiveDate>) = if body.persistent {
+    let start_raw = body.start_date.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let end_raw = body.end_date.as_deref().map(str::trim).filter(|s| !s.is_empty());
+
+    // Be tolerant to client payload quirks: if both dates are absent/empty,
+    // treat the assignment as persistent.
+    let persistent = body.persistent || (start_raw.is_none() && end_raw.is_none());
+
+    let (start_date, end_date): (Option<NaiveDate>, Option<NaiveDate>) = if persistent {
         (None, None)
     } else {
-        let start = body
-            .start_date
-            .as_deref()
+        let start = start_raw
             .ok_or_else(|| AppError::BadRequest("start_date is required when assignment is date-limited".into()))?;
-        let end = body
-            .end_date
-            .as_deref()
+        let end = end_raw
             .ok_or_else(|| AppError::BadRequest("end_date is required when assignment is date-limited".into()))?;
 
         let start = NaiveDate::parse_from_str(start, "%Y-%m-%d")
@@ -307,66 +335,118 @@ async fn assign(
     }
     assert_calendar_access(pool, &child_profile_id, &user).await?;
 
-    // Validate schedule ownership before assignment.
-    let schedule_allowed: bool = if user.role == UserRole::Admin {
-        sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM schedules WHERE id = ? AND status <> 'archived')",
+    #[derive(sqlx::FromRow)]
+    struct ScheduleAccessRow {
+        owner_id: Option<String>,
+        name: String,
+    }
+
+    let schedule_row: Option<ScheduleAccessRow> = if user.role == UserRole::Admin {
+        sqlx::query_as::<_, ScheduleAccessRow>(
+            "SELECT owner_id, name
+             FROM visual_support_documents_templates
+             WHERE id = ?
+               AND document_type = ?
+               AND COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.schedule.status')), ''), 'inactive') <> 'archived'",
         )
         .bind(&body.schedule_id)
-        .fetch_one(pool)
+        .bind(WEEKLY_TYPE)
+        .fetch_optional(pool)
         .await?
     } else {
-        sqlx::query_scalar(
-            "SELECT EXISTS(
-                 SELECT 1
-                 FROM schedules s
-                 WHERE s.id = ?
-                   AND s.owner_id = ?
-                   AND s.status <> 'archived'
-             )",
+        sqlx::query_as::<_, ScheduleAccessRow>(
+            "SELECT owner_id, name
+             FROM visual_support_documents_templates
+             WHERE id = ?
+               AND owner_id = ?
+               AND document_type = ?
+               AND COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.schedule.status')), ''), 'inactive') <> 'archived'",
         )
         .bind(&body.schedule_id)
         .bind(&user.user_id)
-        .fetch_one(pool)
+        .bind(WEEKLY_TYPE)
+        .fetch_optional(pool)
         .await?
     };
-    if !schedule_allowed {
-        return Err(AppError::Forbidden);
-    }
 
-    let has_items: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM schedule_items WHERE schedule_id = ?)",
+    let Some(schedule_row) = schedule_row else {
+        return Err(AppError::Forbidden);
+    };
+
+    let has_activity_cards: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM visual_support_template_activities WHERE template_id = ?)",
     )
     .bind(&body.schedule_id)
     .fetch_one(pool)
     .await?;
 
-    if !has_items {
+    if !has_activity_cards {
         return Err(AppError::BadRequest(
-            "Cannot assign a schedule with no items. Add at least one item first.".into(),
+            "Cannot assign a schedule with no activity cards. Add at least one activity card first.".into(),
         ));
     }
 
-    // One active assignment slot per child/weekday.
     sqlx::query(
-        "DELETE FROM schedule_day_assignments WHERE child_id = ? AND day_of_week = ?",
+        "DELETE FROM visual_support_documents
+         WHERE child_id = ?
+           AND document_type = ?
+           AND CAST(JSON_UNQUOTE(JSON_EXTRACT(content_json, '$.assignment.day_of_week')) AS SIGNED) = ?",
     )
     .bind(&child_profile_id)
-    .bind(body.day_of_week)
+    .bind(WEEKLY_TYPE)
+    .bind(body.day_of_week as i32)
     .execute(pool)
     .await?;
 
+    let assignment_owner = if user.role == UserRole::Admin {
+        schedule_row.owner_id.unwrap_or_else(|| user.user_id.clone())
+    } else {
+        user.user_id.clone()
+    };
+
+    // Note: For persistent assignments we intentionally *omit* start_date/end_date.
+    // Some MariaDB JSON functions can otherwise surface JSON null as the string "null",
+    // which breaks date comparisons when reading assignments back.
+    let mut assignment = serde_json::Map::new();
+    assignment.insert(
+        "day_of_week".to_string(),
+        serde_json::json!(body.day_of_week),
+    );
+    assignment.insert(
+        "persistent".to_string(),
+        serde_json::json!(persistent),
+    );
+    if let Some(d) = start_date {
+        assignment.insert(
+            "start_date".to_string(),
+            serde_json::Value::String(d.format("%Y-%m-%d").to_string()),
+        );
+    }
+    if let Some(d) = end_date {
+        assignment.insert(
+            "end_date".to_string(),
+            serde_json::Value::String(d.format("%Y-%m-%d").to_string()),
+        );
+    }
+
+    let assignment_content = serde_json::json!({ "assignment": assignment });
+
+    let assignment_content_json = serde_json::to_string(&assignment_content)
+        .map_err(|_| AppError::BadRequest("Invalid assignment content JSON".into()))?;
+
     let id = Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT INTO schedule_day_assignments (id, schedule_id, child_id, day_of_week, start_date, end_date)
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO visual_support_documents
+            (id, owner_id, child_id, template_id, title, document_type, locale, layout_spec_json, content_json, version)
+         VALUES (?, ?, ?, ?, ?, ?, 'en', '{}', ?, 1)",
     )
     .bind(&id)
-    .bind(&body.schedule_id)
+    .bind(&assignment_owner)
     .bind(&child_profile_id)
-    .bind(body.day_of_week)
-    .bind(start_date)
-    .bind(end_date)
+    .bind(&body.schedule_id)
+    .bind(&schedule_row.name)
+    .bind(WEEKLY_TYPE)
+    .bind(assignment_content_json)
     .execute(pool)
     .await?;
 
@@ -386,9 +466,12 @@ async fn unassign(
     assert_calendar_access(pool, &child_profile_id, &user).await?;
 
     sqlx::query(
-        "DELETE FROM schedule_day_assignments WHERE id = ? AND child_id = ?",
+        "DELETE FROM visual_support_documents
+         WHERE id = ? AND child_id = ? AND document_type = ?",
     )
-    .bind(&assignment_id).bind(&child_profile_id)
+    .bind(&assignment_id)
+    .bind(&child_profile_id)
+    .bind(WEEKLY_TYPE)
     .execute(pool).await?;
 
     Ok(StatusCode::NO_CONTENT)

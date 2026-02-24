@@ -2,7 +2,7 @@ import { t } from '@/i18n/i18n';
 import { printVisualSupport } from '@/components/Print';
 import { api, ApiError } from '@/api/client';
 import { PHASE_A_LAYOUTS, PHASE_A_SAMPLE_ITEMS, firstEmptyIndex } from '@/visual-support/engine/phaseA';
-import type { PhaseADocumentType, VisualCardItem } from '@/visual-support/engine/types';
+import type { SupportedVisualDocumentType, VisualCardItem } from '@/visual-support/engine/types';
 
 type Slots = Array<VisualCardItem | null>;
 
@@ -49,27 +49,35 @@ interface PictogramSearchItem {
   local_file_path: string | null;
 }
 
-const PHASE_A_TYPES: PhaseADocumentType[] = [
+const PHASE_B_TYPES: SupportedVisualDocumentType[] = [
+  'EMOTION_CARDS',
+  'REWARD_TRACKER',
+];
+
+const SUPPORTED_TYPES: SupportedVisualDocumentType[] = [
   'DAILY_SCHEDULE',
   'FIRST_THEN',
   'CHOICE_BOARD',
   'ROUTINE_STEPS',
+  ...PHASE_B_TYPES,
 ];
 
 export async function render(container: HTMLElement): Promise<void> {
   let defaultPaletteItems = [...PHASE_A_SAMPLE_ITEMS];
   const customPaletteItems: VisualCardItem[] = [];
 
-  let selectedType: PhaseADocumentType = 'DAILY_SCHEDULE';
+  let selectedType: SupportedVisualDocumentType = 'DAILY_SCHEDULE';
   let selectedPaletteId = defaultPaletteItems[0]?.id ?? '';
   let dragState: DragState | null = null;
   let currentDocumentId: string | null = null;
   let currentVersion = 0;
+  let printCutLines = false;
+  let printCropMarks = false;
   let cardSearchDebounce: ReturnType<typeof setTimeout> | null = null;
   let selectedCardPictogramId: string | null = null;
   let selectedCardPictogramUrl: string | undefined = undefined;
 
-  const slotsFor = (type: PhaseADocumentType): Slots =>
+  const slotsFor = (type: SupportedVisualDocumentType): Slots =>
     Array.from({ length: PHASE_A_LAYOUTS[type].slotCount }, () => null);
 
   let slots = slotsFor(selectedType);
@@ -82,7 +90,7 @@ export async function render(container: HTMLElement): Promise<void> {
     };
   }
 
-  function deserializeContent(raw: unknown, type: PhaseADocumentType): Slots {
+  function deserializeContent(raw: unknown, type: SupportedVisualDocumentType): Slots {
     const out = slotsFor(type);
     const root = (raw && typeof raw === 'object') ? raw as { slots?: unknown[] } : {};
     const arr = Array.isArray(root.slots) ? root.slots : [];
@@ -139,6 +147,13 @@ export async function render(container: HTMLElement): Promise<void> {
           <label for="vs-template-select">${t('visual_support.templates')}</label>
           <select id="vs-template-select"><option value="">${t('visual_support.none_templates')}</option></select>
           <button class="btn btn-secondary btn-sm" id="vs-use-template">${t('visual_support.use_template')}</button>
+        </div>
+        <div class="visual-supports-persist__row">
+          <label>${t('visual_support.print_options')}</label>
+          <div class="visual-supports-persist__checks">
+            <label><input id="vs-opt-cut-lines" type="checkbox" /> ${t('visual_support.cut_lines')}</label>
+            <label><input id="vs-opt-crop-marks" type="checkbox" /> ${t('visual_support.crop_marks')}</label>
+          </div>
         </div>
         <p id="vs-status" class="status-msg" aria-live="polite"></p>
       </div>
@@ -217,6 +232,8 @@ export async function render(container: HTMLElement): Promise<void> {
   const titleInput = container.querySelector<HTMLInputElement>('#vs-title')!;
   const docSelect = container.querySelector<HTMLSelectElement>('#vs-doc-select')!;
   const templateSelect = container.querySelector<HTMLSelectElement>('#vs-template-select')!;
+  const cutLinesInput = container.querySelector<HTMLInputElement>('#vs-opt-cut-lines')!;
+  const cropMarksInput = container.querySelector<HTMLInputElement>('#vs-opt-crop-marks')!;
   const cardModal = container.querySelector<HTMLElement>('#vs-card-modal')!;
   const cardForm = container.querySelector<HTMLFormElement>('#vs-card-form')!;
   const customCardInput = container.querySelector<HTMLInputElement>('#vs-custom-card-label')!;
@@ -343,16 +360,19 @@ export async function render(container: HTMLElement): Promise<void> {
     customCardInput.focus();
   }
 
-  function labelForType(type: PhaseADocumentType): string {
+  function labelForType(type: SupportedVisualDocumentType): string {
     switch (type) {
       case 'DAILY_SCHEDULE': return t('visual_support.types.daily');
+      case 'WEEKLY_SCHEDULE': return t('visual_support.types.weekly');
       case 'FIRST_THEN': return t('visual_support.types.first_then');
       case 'CHOICE_BOARD': return t('visual_support.types.choice');
       case 'ROUTINE_STEPS': return t('visual_support.types.routine');
+      case 'EMOTION_CARDS': return t('visual_support.types.emotions');
+      case 'REWARD_TRACKER': return t('visual_support.types.reward');
     }
   }
 
-  function reassignSlots(newType: PhaseADocumentType): void {
+  function reassignSlots(newType: SupportedVisualDocumentType): void {
     selectedType = newType;
     slots = slotsFor(newType);
     titleInput.value = labelForType(newType);
@@ -509,23 +529,26 @@ export async function render(container: HTMLElement): Promise<void> {
     }
   }
 
-  function printClassForType(type: PhaseADocumentType): string {
+  function printClassForType(type: SupportedVisualDocumentType): string {
     switch (type) {
       case 'DAILY_SCHEDULE': return 'print-vs-daily';
+      case 'WEEKLY_SCHEDULE': return 'print-vs-weekly';
       case 'FIRST_THEN': return 'print-vs-first-then';
       case 'CHOICE_BOARD': return 'print-vs-choice';
       case 'ROUTINE_STEPS': return 'print-vs-routine';
+      case 'EMOTION_CARDS': return 'print-vs-emotions';
+      case 'REWARD_TRACKER': return 'print-vs-reward';
     }
   }
 
   async function loadDocument(id: string): Promise<void> {
     try {
       const doc = await api.get<DocumentDto>(`/visual-documents/${id}`);
-      if (!PHASE_A_TYPES.includes(doc.document_type as PhaseADocumentType)) {
-        setStatus(t('visual_support.not_phase_a'));
+      if (!SUPPORTED_TYPES.includes(doc.document_type as SupportedVisualDocumentType)) {
+        setStatus(t('errors.generic'));
         return;
       }
-      selectedType = doc.document_type as PhaseADocumentType;
+      selectedType = doc.document_type as SupportedVisualDocumentType;
       currentDocumentId = doc.id;
       currentVersion = doc.version;
       titleInput.value = doc.title;
@@ -722,11 +745,12 @@ export async function render(container: HTMLElement): Promise<void> {
   }
 
   function rerenderTabs(): void {
-    tabsEl.innerHTML = PHASE_A_TYPES.map((type) => {
+    tabsEl.innerHTML = SUPPORTED_TYPES.map((type) => {
       const selected = selectedType === type;
+      const phaseB = PHASE_B_TYPES.includes(type);
       return `
         <button
-          class="vs-type-tab ${selected ? 'vs-type-tab--active' : ''}"
+          class="vs-type-tab ${selected ? 'vs-type-tab--active' : ''} ${phaseB ? 'vs-type-tab--phase-b' : ''}"
           role="tab"
           aria-selected="${selected ? 'true' : 'false'}"
           data-type="${type}"
@@ -738,7 +762,7 @@ export async function render(container: HTMLElement): Promise<void> {
 
     tabsEl.querySelectorAll<HTMLButtonElement>('[data-type]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        reassignSlots(btn.dataset['type'] as PhaseADocumentType);
+        reassignSlots(btn.dataset['type'] as SupportedVisualDocumentType);
         rerenderTabs();
         rerenderEditor();
         loadDocumentsAndTemplates().catch(() => void 0);
@@ -803,8 +827,9 @@ export async function render(container: HTMLElement): Promise<void> {
   function rerenderEditor(): void {
     const spec = PHASE_A_LAYOUTS[selectedType];
     titleEl.textContent = labelForType(selectedType);
+    const phaseClass = PHASE_B_TYPES.includes(selectedType) ? 'print-vs-phase-b' : 'print-vs-phase-a';
 
-    boardEl.className = `vs-board vs-board--cols-${spec.columns} print-vs-phase-a ${printClassForType(selectedType)}`;
+    boardEl.className = `vs-board vs-board--cols-${spec.columns} ${phaseClass} ${printClassForType(selectedType)}`;
 
     boardEl.innerHTML = slots.map((item, index) => `
       <article class="vs-slot" data-slot-index="${index}">
@@ -920,7 +945,21 @@ export async function render(container: HTMLElement): Promise<void> {
   });
 
   container.querySelector('#vs-print')?.addEventListener('click', () => {
-    printVisualSupport();
+    printVisualSupport({
+      cutLines: printCutLines,
+      cropMarks: printCropMarks,
+    });
+  });
+
+  cutLinesInput.checked = printCutLines;
+  cropMarksInput.checked = printCropMarks;
+
+  cutLinesInput.addEventListener('change', () => {
+    printCutLines = cutLinesInput.checked;
+  });
+
+  cropMarksInput.addEventListener('change', () => {
+    printCropMarks = cropMarksInput.checked;
   });
 
   rerenderTabs();

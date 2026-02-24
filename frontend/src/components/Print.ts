@@ -35,10 +35,19 @@ export function printWeek(): void {
 /**
  * Print visual supports (A4 portrait, print-first cards/boards).
  */
-export function printVisualSupport(): void {
+export interface VisualSupportPrintOptions {
+  cutLines?: boolean;
+  cropMarks?: boolean;
+}
+
+export function printVisualSupport(options: VisualSupportPrintOptions = {}): void {
   document.body.classList.add('printing-visual-support');
+  if (options.cutLines) document.body.classList.add('printing-vs-cut');
+  if (options.cropMarks) document.body.classList.add('printing-vs-crop');
   window.print();
   window.addEventListener('afterprint', () => {
     document.body.classList.remove('printing-visual-support');
+    document.body.classList.remove('printing-vs-cut');
+    document.body.classList.remove('printing-vs-crop');
   }, { once: true });
 }

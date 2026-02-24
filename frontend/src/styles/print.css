@@ -128,6 +128,10 @@
     overflow: visible !important;
   }
 
+  .printing-week .week-grid.week-grid--5 {
+    grid-template-columns: repeat(5, 1fr) !important;
+  }
+
   .printing-week .week-grid__day {
     border: 0.5pt solid #bbb;
     border-radius: 3pt;
@@ -272,6 +276,53 @@
     margin-top: 8pt;
     font-size: 7pt;
     color: #666;
+  }
+
+  body.printing-vs-cut .vs-slot {
+    outline: 1.25pt dashed #444;
+    outline-offset: 2pt;
+  }
+
+  body.printing-vs-crop .visual-supports-editor {
+    position: relative;
+    /* Use border/outline primitives so marks are visible without background graphics. */
+    outline: 1.25pt solid #111;
+    outline-offset: 4pt;
+    border: 1pt dashed #555;
+    box-shadow: 0 0 0 0.75pt #111;
+  }
+
+  body.printing-vs-crop .visual-supports-editor::before,
+  body.printing-vs-crop .visual-supports-editor::after {
+    content: '✂';
+    position: absolute;
+    font-size: 9pt;
+    line-height: 1;
+    color: #111;
+    font-family: 'Times New Roman', serif;
+    pointer-events: none;
+  }
+
+  body.printing-vs-crop .visual-supports-editor::before {
+    top: -11pt;
+    left: -3pt;
+  }
+
+  body.printing-vs-crop .visual-supports-editor::after {
+    bottom: -11pt;
+    right: -3pt;
+  }
+
+  .printing-visual-support .print-vs-weekly .vs-slot,
+  .printing-visual-support .print-vs-emotions .vs-slot,
+  .printing-visual-support .print-vs-reward .vs-slot {
+    min-height: 56pt;
+  }
+
+  .printing-visual-support .print-vs-weekly .vs-card__label,
+  .printing-visual-support .print-vs-emotions .vs-card__label,
+  .printing-visual-support .print-vs-reward .vs-card__label {
+    font-size: 9pt;
   }
 }
 

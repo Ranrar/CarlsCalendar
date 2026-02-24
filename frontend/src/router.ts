@@ -17,12 +17,25 @@ type Route = {
   load: () => Promise<PageModule>;
   requiresAuth?: boolean;
   requiresRole?: 'parent' | 'child' | 'admin';
+  strictRole?: boolean;
   title?: string;
 };
+
+function roleAllows(
+  userRole: NonNullable<typeof session.role>,
+  required: NonNullable<Route['requiresRole']>,
+  strictRole = false,
+): boolean {
+  if (strictRole) return userRole === required;
+  // Treat admin as a superset of parent for navigation purposes.
+  if (required === 'parent') return userRole === 'parent' || userRole === 'admin';
+  return userRole === required;
+}
 
 const routes: Route[] = [
   // Public
   { path: /^\/$/, load: () => import('@/pages/Landing'), title: APP_NAME },
+  { path: /^\/whatisaac$/, load: () => import('@/pages/info/whatisaac'), title: `What is AAC? | ${APP_NAME}` },
   { path: /^\/about$/, load: () => import('@/pages/About'), title: `About | ${APP_NAME}` },
   { path: /^\/contact$/, load: () => import('@/pages/Contact'), title: `Contact | ${APP_NAME}` },
   { path: /^\/privacy$/, load: () => import('@/pages/LegalPrivacy'), title: `Privacy Policy | ${APP_NAME}` },
@@ -35,21 +48,33 @@ const routes: Route[] = [
   { path: /^\/reset-password$/, load: () => import('@/components/auth/AuthResetPassword'), title: `Reset Password | ${APP_NAME}` },
   { path: /^\/qr-login$/, load: () => import('@/components/auth/AuthQrLogin'), title: `QR Login | ${APP_NAME}` },
 
-  // Auth-protected (all roles)
-  { path: /^\/settings$/, load: () => import('@/pages/Parent/Settings'), requiresAuth: true, title: `Settings | ${APP_NAME}` },
+  // Auth-protected (parent/admin)
+  { path: /^\/settings$/, load: () => import('@/pages/Parent/Settings'), requiresAuth: true, requiresRole: 'parent', title: `Settings | ${APP_NAME}` },
 
   // Parent
-  { path: /^\/dashboard$/, load: () => import('@/pages/Parent/Dashboard'), requiresAuth: true, title: `Dashboard | ${APP_NAME}` },
-  { path: /^\/children$/, load: () => import('@/pages/Parent/Children'), requiresAuth: true, requiresRole: 'parent', title: `Children | ${APP_NAME}` },
-  { path: /^\/schedules$/, load: () => import('@/pages/Parent/Schedules'), requiresAuth: true, title: `Schedules | ${APP_NAME}` },
-  { path: /^\/schedules\/[^/]+$/, load: () => import('@/pages/Parent/ScheduleDetail'), requiresAuth: true, title: `Schedule | ${APP_NAME}` },
-  { path: /^\/templates$/, load: () => import('@/pages/Parent/Templates'), requiresAuth: true, title: `Templates | ${APP_NAME}` },
+  { path: /^\/dashboard$/, load: () => import('@/pages/Parent/Dashboard'), requiresAuth: true, requiresRole: 'parent', title: `Dashboard | ${APP_NAME}` },
+  { path: /^\/children$/, load: () => import('@/pages/Parent/Children'), requiresAuth: true, requiresRole: 'parent', strictRole: true, title: `Children | ${APP_NAME}` },
+  // Weekly schedule (canonical)
+  { path: /^\/weeklyschedule\/[^/]+$/, load: () => import('@/pages/Parent/WeeklyScheduleDetail'), requiresAuth: true, requiresRole: 'parent', title: `Weekly schedule | ${APP_NAME}` },
+  { path: /^\/weeklyschedule$/, load: () => import('@/pages/Parent/Calendar'), requiresAuth: true, requiresRole: 'parent', title: `Weekly schedule | ${APP_NAME}` },
+
+  // Phase 0 placeholders (parent/admin)
+  { path: /^\/daily-schedule$/, load: () => import('@/pages/Parent/Phase0Placeholder'), requiresAuth: true, requiresRole: 'parent', title: `Daily schedule | ${APP_NAME}` },
+  { path: /^\/first-then$/, load: () => import('@/pages/Parent/FirstThen'), requiresAuth: true, requiresRole: 'parent', title: `First / Then | ${APP_NAME}` },
+  { path: /^\/choice-board$/, load: () => import('@/pages/Parent/Phase0Placeholder'), requiresAuth: true, requiresRole: 'parent', title: `Choice board | ${APP_NAME}` },
+  { path: /^\/routine-steps$/, load: () => import('@/pages/Parent/Phase0Placeholder'), requiresAuth: true, requiresRole: 'parent', title: `Routine steps | ${APP_NAME}` },
+  { path: /^\/emotion-cards$/, load: () => import('@/pages/Parent/Phase0Placeholder'), requiresAuth: true, requiresRole: 'parent', title: `Emotion cards | ${APP_NAME}` },
+  { path: /^\/reward-tracker$/, load: () => import('@/pages/Parent/Phase0Placeholder'), requiresAuth: true, requiresRole: 'parent', title: `Reward tracker | ${APP_NAME}` },
+  { path: /^\/aac-board$/, load: () => import('@/pages/Parent/Phase0Placeholder'), requiresAuth: true, requiresRole: 'parent', title: `AAC board | ${APP_NAME}` },
+  { path: /^\/activity-cards$/, load: () => import('@/pages/Parent/ActivityCards'), requiresAuth: true, requiresRole: 'parent', title: `Activity cards | ${APP_NAME}` },
+  { path: /^\/child-devices$/, load: () => import('@/pages/Parent/ChildDevices'), requiresAuth: true, requiresRole: 'parent', strictRole: true, title: `Child devices & QR management | ${APP_NAME}` },
+
+  { path: /^\/templates$/, load: () => import('@/pages/Parent/Templates'), requiresAuth: true, requiresRole: 'parent', title: `Templates | ${APP_NAME}` },
   { path: /^\/visual-supports$/, load: () => import('@/pages/Parent/VisualSupports'), requiresAuth: true, requiresRole: 'parent', title: `Visual Supports | ${APP_NAME}` },
-  { path: /^\/calendar$/, load: () => import('@/pages/Parent/Calendar'), requiresAuth: true, title: `Calendar | ${APP_NAME}` },
   { path: /^\/pictograms$/, load: () => import('@/pages/Parent/PictogramLibrary'), requiresAuth: true, requiresRole: 'parent', title: `Pictograms | ${APP_NAME}` },
 
   // Child
-  { path: /^\/my-calendar$/, load: () => import('@/pages/Child/Calendar'), title: `My Calendar | ${APP_NAME}` },
+  { path: /^\/my-calendar$/, load: () => import('@/pages/Child/Calendar'), requiresAuth: true, requiresRole: 'child', title: `My Calendar | ${APP_NAME}` },
 
   // Admin
   { path: /^\/admin$/, load: () => import('@/pages/Admin/Dashboard'), requiresAuth: true, requiresRole: 'admin', title: `Admin | ${APP_NAME}` },
@@ -114,8 +139,12 @@ async function navigate(path: string): Promise<void> {
   // Route guards
   if (matched.requiresAuth) {
     if (!session.isLoggedIn) { router.replace('/login'); return; }
-    if (matched.requiresRole && session.role !== matched.requiresRole) {
-      router.replace('/'); return;
+    if (matched.requiresRole) {
+      const role = session.role;
+      if (!role || !roleAllows(role, matched.requiresRole, matched.strictRole ?? false)) {
+        router.replace('/');
+        return;
+      }
     }
   }
 

@@ -14,14 +14,21 @@ export type PhaseADocumentType =
   | 'CHOICE_BOARD'
   | 'ROUTINE_STEPS';
 
+export type PhaseBDocumentType =
+  | 'WEEKLY_SCHEDULE'
+  | 'EMOTION_CARDS'
+  | 'REWARD_TRACKER';
+
+export type SupportedVisualDocumentType = PhaseADocumentType | PhaseBDocumentType;
+
 export interface VisualCardItem {
   id: string;
   label: string;
   pictogramUrl?: string;
 }
 
-export interface PhaseALayoutSpec {
-  type: PhaseADocumentType;
+export interface VisualLayoutSpec {
+  type: SupportedVisualDocumentType;
   title: string;
   slotCount: number;
   columns: number;

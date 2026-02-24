@@ -13,7 +13,7 @@ interface WeekResponse {
     assignment_id: string | null;
     schedule_id: string | null;
     schedule_name: string | null;
-    items: ScheduleItemData[];
+    activity_cards: ScheduleItemData[];
   }[];
 }
 
@@ -41,6 +41,7 @@ export async function render(container: HTMLElement): Promise<void> {
   const today = new Date();
   let week = getISOWeek(today);
   let year = today.getFullYear();
+  const visibleDays: 5 | 7 = (localStorage.getItem('calendar.visibleDays') === '5' ? 5 : 7);
 
   container.innerHTML = `
     <main class="container page-content">
@@ -101,10 +102,10 @@ export async function render(container: HTMLElement): Promise<void> {
         assignment_id: d.assignment_id,
         schedule_id:   d.schedule_id,
         schedule_name: d.schedule_name,
-        items:         d.items,
+        activity_cards: d.activity_cards,
       }));
 
-      renderWeekView(wrap, days, week, year, true /* readonly */, getUserWeekStart());
+      renderWeekView(wrap, days, week, year, true /* readonly */, getUserWeekStart(), visibleDays);
 
       // Highlight today
       wrap.querySelectorAll<HTMLElement>('.week-grid__day').forEach((col) => {
@@ -143,9 +144,9 @@ export async function render(container: HTMLElement): Promise<void> {
     container.querySelector<HTMLElement>('#day-modal-title')!.textContent =
       `${day.schedule_name ?? t('calendar.no_schedule')} — ${formatIsoDateForUser(day.date)}`;
     const body = container.querySelector<HTMLElement>('#day-modal-body')!;
-    body.innerHTML = day.items.length === 0
-      ? `<p class="calendar-day-empty">${t('calendar.no_items')}</p>`
-      : day.items.map((item) => `
+    body.innerHTML = day.activity_cards.length === 0
+      ? `<p class="calendar-day-empty">${t('calendar.no_activity_cards')}</p>`
+      : day.activity_cards.map((item) => `
           <div class="item-card card calendar-day-item">
             <div class="item-card__body">
               <div class="item-card__head">

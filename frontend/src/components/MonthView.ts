@@ -45,7 +45,7 @@ export function renderMonthView(
           data-date="${day.date}"
           role="button"
           tabindex="0"
-          aria-label="${t('calendar.assign')}: ${formatIsoDateForUser(day.date)}"
+          aria-label="${t('calendar.assign_weekly_schedule')}: ${formatIsoDateForUser(day.date)}"
         >
           ${Number.parseInt(dayNumber, 10)}
         </div>

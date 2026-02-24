@@ -63,8 +63,9 @@ Use this enum in both frontend and backend:
 - `CHOICE_BOARD`
 - `ROUTINE_STEPS`
 - `EMOTION_CARDS`
-- `AAC_BOARD`
 - `REWARD_TRACKER`
+
+`AAC_BOARD` is specified in `documents/AAC_BOARD.md`.
 
 Backend representation: SQL `ENUM` or constrained `VARCHAR` + validator.
 Frontend representation: TypeScript union + runtime guard.
@@ -161,11 +162,6 @@ Define each as `DocumentLayoutPreset` in:
 - sheet compositor for multi-card A4
 - cut lines optional
 
-### AAC_BOARD
-- fixed grid with optional category zones
-- symbol positions persisted and stable across sessions
-- no dynamic re-sort
-
 ### REWARD_TRACKER
 - linear slots (5-10)
 - clearly distinguished empty/filled states
@@ -214,14 +210,6 @@ Use consolidated migrations:
 - `url_or_path`
 - `attribution_json`
 
-#### `visual_document_positions`
-(needed for AAC board and movable cut/laminate mode)
-- `id` (uuid, pk)
-- `document_id` (fk)
-- `item_key` (varchar)
-- `x`, `y`, `w`, `h` (grid units)
-- unique (`document_id`, `item_key`)
-
 ### Optional table
 
 #### `visual_document_exports`
@@ -254,7 +242,7 @@ Add route module: `backend/src/routes/visual_documents.rs`
 - `POST /visual-documents/{id}/render/svg`
 - `POST /visual-documents/{id}/export/pdf`
 
-- `POST /visual-documents/{id}/positions` (bulk upsert for stable placements)
+- (Removed in current implementation) dedicated `/positions` endpoint; placement is persisted in `content_json` slot ordering.
 
 ### Validation rules (backend-enforced)
 
@@ -362,7 +350,7 @@ Seed default templates (admin/system):
 - Choice board (2 options, 4 options)
 - Handwashing routine steps
 - Emotion starter cards (happy/sad/angry/scared/calm)
-- Basic AAC core board
+See `documents/AAC_BOARD.md` for AAC template definitions.
 - 5-slot and 10-slot reward trackers
 
 Backend seed mechanism can mirror existing template strategy used in schedules.
@@ -371,20 +359,43 @@ Backend seed mechanism can mirror existing template strategy used in schedules.
 
 ## 13) Rollout Plan
 
+Status snapshot (reviewed against current code on 2026-02-23).
+
 ### Phase A (MVP)
-- Document types: `DAILY_SCHEDULE`, `FIRST_THEN`, `CHOICE_BOARD`, `ROUTINE_STEPS`
-- Template gallery + copy
-- Print CSS + browser PDF
+- ✅ Document types: `DAILY_SCHEDULE`, `FIRST_THEN`, `CHOICE_BOARD`, `ROUTINE_STEPS`
+  - Implemented in parent editor: `frontend/src/pages/Parent/VisualSupports.ts`
+  - Backend validation in: `backend/src/routes/visual_documents.rs`
+- ✅ Template gallery + copy
+  - Parent flow supports list/save/load/copy-from-template in `VisualSupports.ts`
+  - Admin template manager exists in `frontend/src/pages/Admin/VisualTemplates.ts`
+- ✅ Print CSS
+  - Phase A print classes and print mode are implemented (`frontend/src/styles/print.css`, `frontend/src/components/Print.ts`)
 
 ### Phase B
-- `WEEKLY_SCHEDULE`, `EMOTION_CARDS`, `REWARD_TRACKER`
-- crop/cut marks
-- position persistence for movable mode
+- ✅ `WEEKLY_SCHEDULE`, `EMOTION_CARDS`, `REWARD_TRACKER`
+  - Added to parent visual editor type tabs + layout presets
+  - Persisted through existing document/template APIs and backend validation
+- ✅ crop/cut marks
+  - Added print options + print classes (`cut lines`, `crop marks`) for visual supports
+- ✅ position persistence on save
+  - Persisted directly in `content_json` slot ordering (no separate positions table/API)
+
+Remaining Phase B refinement:
+- Improve per-type specialized visual treatment (currently uses shared grid/card renderer).
 
 ### Phase C
-- `AAC_BOARD` stable position workspace
-- server-side PDF export endpoint
-- audit logs for exports (optional compliance extension)
+- ❌ server-side PDF export endpoint
+  - No backend `/render/svg` or `/export/pdf` endpoint currently implemented
+- ❌ audit logs for exports (optional compliance extension)
+  - Not implemented (blocked by missing export pipeline)
+
+AAC board rollout/status is tracked in `documents/AAC_BOARD.md`.
+
+### Recommended next steps
+1. Extend parent editor with Phase B document renderers/presets.
+2. Add cut/crop mark options in print CSS + UI toggles.
+3. Introduce document position persistence model + endpoints.
+4. Implement server-side export pipeline, then add export audit logging.
 
 ---
 
@@ -396,8 +407,7 @@ Backend seed mechanism can mirror existing template strategy used in schedules.
 4. Pictogram min printed height requirement always met.
 5. FIRST_THEN always contains exactly two visual zones.
 6. CHOICE_BOARD never exceeds 4 options.
-7. AAC board symbol positions remain stable unless explicitly edited.
-8. Attribution appears in exported/printed output when ARASAAC assets are used.
+7. Attribution appears in exported/printed output when ARASAAC assets are used.
 
 ---
 
@@ -430,12 +440,16 @@ Backend seed mechanism can mirror existing template strategy used in schedules.
 
 ## 17) Immediate Next Implementation Tasks
 
-1. Keep visual support schema in consolidated baseline migration (`001_initial_schema.sql`).
-2. Add backend route module `visual_documents.rs` + DTOs + validators.
-3. Implement `frontend/src/visual-support/engine` core contracts.
-4. Add `/visual-supports` routes/pages and template gallery.
-5. Extend print CSS for first 4 document types.
-6. Add ARASAAC attribution footer utility shared by all printable outputs.
+1. Implement dedicated per-type renderers for `WEEKLY_SCHEDULE`, `EMOTION_CARDS`, and `REWARD_TRACKER` in `frontend/src/pages/Parent/VisualSupports.ts` (beyond shared grid/card rendering).
+2. Implement backend endpoints for deterministic exports:
+  - `POST /visual-documents/{id}/render/svg`
+  - `POST /visual-documents/{id}/export/pdf`
+3. Add export audit logging once server-side export pipeline exists.
+4. Add focused regression tests:
+  - backend position persistence + type-cardinality tests
+  - frontend print-variant visual regression for Phase B modes
+
+AAC board immediate tasks are tracked in `documents/AAC_BOARD.md`.
 
 ---
 

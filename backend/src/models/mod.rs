@@ -103,10 +103,10 @@ pub enum ScheduleStatus {
     Archived,
 }
 
-// ── Schedule items ────────────────────────────────────────────
+// ── Schedule activity cards ───────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct ScheduleItem {
+pub struct ScheduleActivityCard {
     pub id:           Uuid,
     pub schedule_id:  Uuid,
     pub title:        String,

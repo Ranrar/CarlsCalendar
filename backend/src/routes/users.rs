@@ -102,9 +102,10 @@ struct ExportScheduleRow {
 }
 
 #[derive(Serialize, FromRow)]
-struct ExportItemRow {
+struct ExportActivityCardRow {
     id: String,
     schedule_id: String,
+    activity_card_id: Option<String>,
     title: String,
     description: Option<String>,
     picture_path: Option<String>,
@@ -306,35 +307,61 @@ async fn export_me(
     .await?;
 
     let schedules: Vec<ExportScheduleRow> = sqlx::query_as::<_, ExportScheduleRow>(
-        "SELECT id, owner_id, child_id, name, status, is_template, source_template_id, created_at, updated_at
-         FROM schedules
-         WHERE owner_id = ?
-         ORDER BY created_at",
+                "SELECT
+                        t.id,
+                        t.owner_id,
+                    CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.schedule.child_id')), '') AS CHAR(36)) AS child_id,
+                        t.name,
+                    CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.schedule.status')), ''), 'inactive') AS CHAR(20)) AS status,
+                        IF(JSON_EXTRACT(t.metadata_json, '$.schedule.is_template') = true OR t.is_system = 1, 1, 0) AS is_template,
+                    CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(t.metadata_json, '$.schedule.source_template_id')), '') AS CHAR(36)) AS source_template_id,
+                        t.created_at,
+                        t.updated_at
+                 FROM visual_support_documents_templates t
+                 WHERE t.owner_id = ?
+                     AND t.document_type = 'WEEKLY_SCHEDULE'
+                 ORDER BY t.created_at",
     )
     .bind(&auth.user_id)
     .fetch_all(pool)
     .await?;
 
-    let schedule_items: Vec<ExportItemRow> = sqlx::query_as::<_, ExportItemRow>(
-        "SELECT si.id, si.schedule_id, si.title, si.description, si.picture_path,
-                TIME_FORMAT(si.start_time, '%H:%i') AS start_time,
-                TIME_FORMAT(si.end_time,   '%H:%i') AS end_time,
-                si.sort_order, si.created_at
-         FROM schedule_items si
-         JOIN schedules s ON s.id = si.schedule_id
-         WHERE s.owner_id = ?
-         ORDER BY si.schedule_id, si.sort_order",
+    let schedule_activity_cards: Vec<ExportActivityCardRow> = sqlx::query_as::<_, ExportActivityCardRow>(
+        "SELECT
+            vta.id,
+                        t.id AS schedule_id,
+            vta.activity_card_id,
+            COALESCE(NULLIF(vta.text_label, ''), vsa.label_text) AS title,
+            vta.optional_notes AS description,
+            CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(vta.metadata_json, '$.picture_path')), ''), vsa.local_image_path) AS CHAR(500)) AS picture_path,
+            CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(vta.metadata_json, '$.start_time')), ''), '08:00') AS CHAR(5)) AS start_time,
+            CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(vta.metadata_json, '$.end_time')), '') AS CHAR(5)) AS end_time,
+            vta.activity_order AS sort_order,
+            vta.created_at
+         FROM visual_support_template_activities vta
+         LEFT JOIN visual_support_activity_library vsa ON vsa.id = vta.activity_card_id
+                 JOIN visual_support_documents_templates t ON t.id = vta.template_id
+                 WHERE t.owner_id = ?
+                     AND t.document_type = 'WEEKLY_SCHEDULE'
+                 ORDER BY t.id, vta.activity_order",
     )
     .bind(&auth.user_id)
     .fetch_all(pool)
     .await?;
 
     let assignments: Vec<ExportAssignmentRow> = sqlx::query_as::<_, ExportAssignmentRow>(
-        "SELECT a.id, a.schedule_id, a.child_id, a.day_of_week, a.created_at
-         FROM schedule_day_assignments a
-         JOIN child_profiles cp ON cp.id = a.child_id
-         WHERE cp.parent_id = ?
-         ORDER BY a.child_id, a.day_of_week",
+                "SELECT
+                        d.id,
+                        d.template_id AS schedule_id,
+                        d.child_id,
+                        CAST(JSON_UNQUOTE(JSON_EXTRACT(d.content_json, '$.assignment.day_of_week')) AS SIGNED) AS day_of_week,
+                        d.created_at
+                 FROM visual_support_documents d
+                 JOIN child_profiles cp ON cp.id = d.child_id
+                 WHERE cp.parent_id = ?
+                     AND d.document_type = 'WEEKLY_SCHEDULE'
+                     AND d.template_id IS NOT NULL
+                 ORDER BY d.child_id, day_of_week",
     )
     .bind(&auth.user_id)
     .fetch_all(pool)
@@ -367,7 +394,7 @@ async fn export_me(
         "user": user,
         "children": children,
         "schedules": schedules,
-        "schedule_items": schedule_items,
+        "schedule_activity_cards": schedule_activity_cards,
         "assignments": assignments,
         "child_devices": devices
     })))

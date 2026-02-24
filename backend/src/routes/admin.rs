@@ -147,14 +147,52 @@ async fn create_template(
 ) -> AppResult<(StatusCode, Json<TemplateRow>)> {
     let pool = &state.pool;
     let id = Uuid::new_v4().to_string();
+    let metadata_json = serde_json::to_string(&serde_json::json!({
+        "layout": {
+            "type": "WEEKLY_SCHEDULE",
+            "columns": 1,
+            "slotCount": 10
+        },
+        "schedule": {
+            "status": "active",
+            "is_template": true,
+            "child_id": null,
+            "source_template_id": null
+        }
+    }))
+    .map_err(|_| AppError::BadRequest("Invalid metadata JSON".into()))?;
+
     sqlx::query(
-        "INSERT INTO schedules (id, owner_id, name, status, is_template) VALUES (?, ?, ?, 'active', 1)",
+        "INSERT INTO visual_support_documents_templates
+            (id, owner_id, name, description, document_type, scenario_type, language, is_system, metadata_json)
+         VALUES (?, ?, ?, NULL, 'DAILY_SCHEDULE', 'CUSTOM', 'en', 0, JSON_OBJECT())",
     )
-    .bind(&id).bind(&admin.user_id).bind(&body.name)
-    .execute(pool).await?;
+    .bind(&id)
+    .bind(&admin.user_id)
+    .bind(&body.name)
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        "UPDATE visual_support_documents_templates
+         SET document_type = 'WEEKLY_SCHEDULE',
+             is_system = 1,
+             metadata_json = ?
+         WHERE id = ?",
+    )
+    .bind(&metadata_json)
+    .bind(&id)
+    .execute(pool)
+    .await?;
 
     let row: TemplateRow = sqlx::query_as::<_, TemplateRow>(
-        "SELECT id, owner_id, name, status FROM schedules WHERE id = ?",
+        "SELECT
+            id,
+            COALESCE(owner_id, '') AS owner_id,
+            name,
+            CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.schedule.status')), ''), 'inactive') AS CHAR(20)) AS status
+         FROM visual_support_documents_templates
+         WHERE id = ?",
     )
     .bind(&id).fetch_one(pool).await?;
     Ok((StatusCode::CREATED, Json(row)))
@@ -166,9 +204,14 @@ async fn list_templates(
 ) -> AppResult<Json<Vec<TemplateRow>>> {
     let pool = &state.pool;
     let rows: Vec<TemplateRow> = sqlx::query_as::<_, TemplateRow>(
-        "SELECT id, owner_id, name, status
-         FROM schedules
-         WHERE is_template = 1
+                "SELECT
+                        id,
+                        COALESCE(owner_id, '') AS owner_id,
+                        name,
+                    CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.schedule.status')), ''), 'inactive') AS CHAR(20)) AS status
+                 FROM visual_support_documents_templates
+                 WHERE document_type = 'WEEKLY_SCHEDULE'
+                     AND (is_system = 1 OR IFNULL(JSON_EXTRACT(metadata_json, '$.schedule.is_template') = true, 0) = 1)
          ORDER BY status, name",
     )
     .fetch_all(pool)
@@ -184,18 +227,30 @@ async fn update_template(
 ) -> AppResult<Json<TemplateRow>> {
     let pool = &state.pool;
     let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM schedules WHERE id = ? AND is_template = 1)",
+        "SELECT EXISTS(
+            SELECT 1
+            FROM visual_support_documents_templates
+            WHERE id = ?
+              AND document_type = 'WEEKLY_SCHEDULE'
+              AND (is_system = 1 OR IFNULL(JSON_EXTRACT(metadata_json, '$.schedule.is_template') = true, 0) = 1)
+        )",
     )
     .bind(&id).fetch_one(pool).await?;
     if !exists { return Err(AppError::NotFound); }
 
     if let Some(name) = &body.name {
-        sqlx::query("UPDATE schedules SET name = ? WHERE id = ?")
+        sqlx::query("UPDATE visual_support_documents_templates SET name = ? WHERE id = ?")
             .bind(name).bind(&id).execute(pool).await?;
     }
 
     let row: TemplateRow = sqlx::query_as::<_, TemplateRow>(
-        "SELECT id, owner_id, name, status FROM schedules WHERE id = ?",
+        "SELECT
+            id,
+            COALESCE(owner_id, '') AS owner_id,
+            name,
+            CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(metadata_json, '$.schedule.status')), ''), 'inactive') AS CHAR(20)) AS status
+         FROM visual_support_documents_templates
+         WHERE id = ?",
     )
     .bind(&id).fetch_one(pool).await?;
     Ok(Json(row))
@@ -208,9 +263,11 @@ async fn delete_template(
 ) -> AppResult<StatusCode> {
     let pool = &state.pool;
     let affected = sqlx::query(
-        "UPDATE schedules
-         SET status = 'archived'
-         WHERE id = ? AND is_template = 1",
+                "UPDATE visual_support_documents_templates
+                 SET metadata_json = JSON_SET(COALESCE(metadata_json, JSON_OBJECT()), '$.schedule.status', 'archived')
+                 WHERE id = ?
+                     AND document_type = 'WEEKLY_SCHEDULE'
+                     AND (is_system = 1 OR IFNULL(JSON_EXTRACT(metadata_json, '$.schedule.is_template') = true, 0) = 1)",
     )
     .bind(&id)
     .execute(pool)

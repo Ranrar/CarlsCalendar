@@ -13,7 +13,7 @@ interface Template {
   is_template: boolean;
 }
 
-interface TemplateItem {
+interface TemplateActivityCard {
   id: string;
   title: string;
   description: string | null;
@@ -24,7 +24,7 @@ interface TemplateItem {
 }
 
 interface TemplateDetail extends Template {
-  items: TemplateItem[];
+  activity_cards: TemplateActivityCard[];
 }
 
 function escapeHtml(s: string): string {
@@ -38,8 +38,8 @@ export async function render(container: HTMLElement): Promise<void> {
     <main class="container page-content">
       <div class="page-header">
         <div>
-          <a class="btn btn-secondary btn-sm templates-back-link" href="/schedules">
-            ← ${t('schedule.back_schedules')}
+          <a class="btn btn-secondary btn-sm templates-back-link" href="/weeklyschedule">
+            ← ${t('schedule.back_weekly_schedule')}
           </a>
           <h1>${t('schedule.template_browser')}</h1>
           <p class="templates-intro">${t('schedule.template_browser_desc')}</p>
@@ -135,11 +135,11 @@ export async function render(container: HTMLElement): Promise<void> {
     try {
       const detail = await api.get<TemplateDetail>(`/schedules/templates/${id}`);
       previewTitle.textContent = detail.name;
-      if (detail.items.length === 0) {
-        previewBody.innerHTML = `<p class="templates-preview-empty">${t('schedule.item.empty')}</p>`;
+      if (detail.activity_cards.length === 0) {
+        previewBody.innerHTML = `<p class="templates-preview-empty">${t('schedule.activity_card.empty')}</p>`;
         return;
       }
-      previewBody.innerHTML = detail.items.map((item) => `
+      previewBody.innerHTML = detail.activity_cards.map((item) => `
         <div class="item-card card templates-preview-item">
           <div class="item-card__body">
             <div class="item-card__head">
@@ -189,8 +189,8 @@ export async function render(container: HTMLElement): Promise<void> {
     setTimeout(() => {
       toast.classList.remove('toast--visible');
       toast.classList.add('toast--hidden');
-      // Navigate to schedules so the user can see their new copy
-      if (message === t('schedule.template_copied')) router.push('/schedules');
+      // Navigate to calendar where schedule management now lives.
+      if (message === t('schedule.template_copied')) router.push('/weeklyschedule');
     }, 1800);
   }
 

@@ -1,6 +1,6 @@
-import type { PhaseADocumentType, PhaseALayoutSpec, VisualCardItem } from './types';
+import type { SupportedVisualDocumentType, VisualLayoutSpec, VisualCardItem } from './types';
 
-export const PHASE_A_LAYOUTS: Record<PhaseADocumentType, PhaseALayoutSpec> = {
+export const PHASE_A_LAYOUTS: Record<SupportedVisualDocumentType, VisualLayoutSpec> = {
   DAILY_SCHEDULE: {
     type: 'DAILY_SCHEDULE',
     title: 'Daily schedule',
@@ -24,6 +24,24 @@ export const PHASE_A_LAYOUTS: Record<PhaseADocumentType, PhaseALayoutSpec> = {
     title: 'Routine steps',
     slotCount: 6,
     columns: 1,
+  },
+  WEEKLY_SCHEDULE: {
+    type: 'WEEKLY_SCHEDULE',
+    title: 'Weekly schedule',
+    slotCount: 7,
+    columns: 7,
+  },
+  EMOTION_CARDS: {
+    type: 'EMOTION_CARDS',
+    title: 'Emotion cards',
+    slotCount: 6,
+    columns: 3,
+  },
+  REWARD_TRACKER: {
+    type: 'REWARD_TRACKER',
+    title: 'Reward tracker',
+    slotCount: 10,
+    columns: 5,
   },
 };
 

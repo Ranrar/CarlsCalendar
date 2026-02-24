@@ -9,7 +9,7 @@ export interface WeekDay {
   assignment_id: string | null;
   schedule_id:   string | null;
   schedule_name: string | null;
-  items: ScheduleItemData[];
+  activity_cards: ScheduleItemData[];
 }
 
 /**
@@ -27,6 +27,7 @@ export function renderWeekView(
   year: number,
   readonly = false,
   weekStart = 1,
+  visibleDays: 5 | 7 = 7,
 ): void {
   const dayNamesByDow: Record<number, 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'> = {
     1: 'mon',
@@ -41,6 +42,7 @@ export function renderWeekView(
     .slice(weekStart - 1)
     .concat([1, 2, 3, 4, 5, 6, 7].slice(0, weekStart - 1));
   const orderedDays = orderedDows
+    .filter((dow) => visibleDays === 7 || dow <= 5)
     .map((dow) => days.find((d) => d.day_of_week === dow))
     .filter((d): d is WeekDay => Boolean(d));
 
@@ -53,7 +55,7 @@ export function renderWeekView(
         <button class="btn btn-secondary btn-sm js-print-week no-print" title="${t('print.week')}">🖨 ${t('print.week')}</button>
       </div>
     </header>
-    <div class="week-grid printable-week">
+    <div class="week-grid week-grid--${visibleDays} printable-week">
       ${orderedDays.map((day) => `
         <div class="week-grid__day">
           <h3 class="week-grid__day-name">${t(`calendar.days.${dayNamesByDow[day.day_of_week]}`)}</h3>
@@ -66,11 +68,11 @@ export function renderWeekView(
                   : ''}
               </div>`
             : (!readonly
-                ? `<button class="btn btn-secondary btn-sm js-assign" data-dow="${day.day_of_week}" data-date="${day.date}">${t('calendar.assign')}</button>`
+              ? `<button class="btn btn-secondary btn-sm js-assign" data-dow="${day.day_of_week}" data-date="${day.date}">${t('calendar.assign_weekly_schedule')}</button>`
                 : '')
           }
           <div class="week-grid__items" data-day="${day.day_of_week}">
-            ${day.items.length === 0 && !day.schedule_name ? '<p style="color:var(--text-dim);font-size:.875rem;margin:0">—</p>' : ''}
+            ${day.activity_cards.length === 0 && !day.schedule_name ? '<p style="color:var(--text-dim);font-size:.875rem;margin:0">—</p>' : ''}
           </div>
         </div>
       `).join('')}
@@ -80,7 +82,7 @@ export function renderWeekView(
   orderedDays.forEach((day, i) => {
     const col = container.querySelectorAll<HTMLElement>('.week-grid__items')[i];
     if (!col) return;
-    day.items.forEach((item) => col.appendChild(createScheduleItem(item)));
+    day.activity_cards.forEach((item) => col.appendChild(createScheduleItem(item)));
   });
 
   // Wire print button
