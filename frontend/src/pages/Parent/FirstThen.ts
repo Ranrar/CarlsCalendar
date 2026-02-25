@@ -154,17 +154,17 @@ export async function render(container: HTMLElement): Promise<void> {
         </div>
       </div>
 
-      <section class="card weekly-schedules">
+      <section class="card weekly-schedules ft-schema-card">
         <div class="weekly-schedules__head">
           <h2>${t('first_then_page.schema_title')}</h2>
-          <button class="btn btn-primary btn-sm" id="ft-new-schema">+ ${t('first_then_page.new_schema')}</button>
+          <button class="btn btn-primary" id="ft-new-schema">+ ${t('first_then_page.new_schema')}</button>
         </div>
         <div class="visual-supports-persist__row" style="margin:.5rem 0 .75rem 0;">
           <label for="ft-template-select">${t('first_then_page.load_templates')}</label>
           <select id="ft-template-select">
             <option value="">${t('common.loading')}</option>
           </select>
-          <button class="btn btn-secondary btn-sm" id="ft-load-template">${t('first_then_page.load')}</button>
+          <button class="btn btn-secondary" id="ft-load-template">${t('first_then_page.load')}</button>
           <span></span>
         </div>
 
@@ -231,7 +231,7 @@ export async function render(container: HTMLElement): Promise<void> {
       </section>
 
       <div class="modal-backdrop hidden" id="ft-edit-modal">
-        <dialog class="modal vs-card-modal" open role="dialog" aria-modal="true" aria-labelledby="ft-edit-title">
+        <dialog class="modal vs-card-modal ft-edit-modal-card" open role="dialog" aria-modal="true" aria-labelledby="ft-edit-title">
           <h2 id="ft-edit-title">${t('first_then_page.edit_slot')}</h2>
 
           <div class="pict-tabs" role="tablist" aria-label="Sources">
@@ -461,7 +461,7 @@ export async function render(container: HTMLElement): Promise<void> {
       const header = firstThenSlotLabel(index);
       const hoverAction = item ? t('schedule.edit') : t('visual_support.add');
       return `
-        <article class="vs-slot" data-open-slot="${index}" tabindex="0" role="button" aria-label="${escapeHtml(t('first_then_page.open_slot'))}">
+        <article class="vs-slot${item ? '' : ' vs-slot--empty-state'}" data-open-slot="${index}" tabindex="0" role="button" aria-label="${escapeHtml(t('first_then_page.open_slot'))}">
           <header class="vs-slot__header">
             <strong>${escapeHtml(header)}</strong>
           </header>
@@ -473,24 +473,31 @@ export async function render(container: HTMLElement): Promise<void> {
                   ${showText ? `<span class="vs-card__label">${escapeHtml(item.label)}</span>` : ''}
                 </div>
               </div>`
-            : `<div class="vs-slot__empty"><span class="vs-slot__empty-label">${t('visual_support.empty')}</span></div>`}
+            : `<div class="vs-slot__empty">
+                <span class="vs-slot__empty-label">${t('visual_support.empty')}</span>
+                <span class="vs-slot__empty-add">+ ${t('visual_support.add')}</span>
+              </div>`}
 
-          <div class="vs-slot__hover-action">${escapeHtml(hoverAction)}</div>
+          ${item ? `<div class="vs-slot__hover-action">${escapeHtml(hoverAction)}</div>` : ''}
         </article>
       `;
     }).join('');
 
     boardEl.querySelectorAll<HTMLElement>('[data-open-slot]').forEach((slotEl) => {
-      const open = () => {
+      const open = (delayForEmpty = false) => {
         const slot = Number(slotEl.dataset['openSlot']);
         if (Number.isNaN(slot)) return;
+        if (delayForEmpty && slotEl.classList.contains('vs-slot--empty-state')) {
+          window.setTimeout(() => openEditModal(slot), 120);
+          return;
+        }
         openEditModal(slot);
       };
-      slotEl.addEventListener('click', open);
+      slotEl.addEventListener('click', () => open(true));
       slotEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          open();
+          open(false);
         }
       });
     });

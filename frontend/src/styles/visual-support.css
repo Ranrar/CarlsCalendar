@@ -193,6 +193,16 @@
   font-size: 0.9rem;
 }
 
+.ft-schema-card .weekly-schedules__head h2 {
+  font-size: 1.5rem;
+}
+
+.ft-schema-card .weekly-schedules__head .btn,
+.ft-schema-card .visual-supports-persist__row .btn {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.9375rem;
+}
+
 .ft-print-options-row {
   display: flex;
   flex-wrap: wrap;
@@ -219,6 +229,7 @@
 .ft-inline-check input {
   width: auto;
   min-height: 0;
+  accent-color: var(--accent);
 }
 
 .ft-help {
@@ -377,6 +388,85 @@
   max-width: 680px;
 }
 
+.ft-edit-modal-card {
+  width: min(680px, 95vw);
+  height: min(700px, calc(100vh - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: 0.65rem;
+}
+
+.ft-edit-modal-card .pict-tabs {
+  margin-top: 0.25rem;
+  margin-bottom: 0.15rem;
+}
+
+.ft-edit-modal-card .pict-tab {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 0.45rem 0.95rem;
+  color: var(--text-muted);
+}
+
+.ft-edit-modal-card .pict-tab:hover,
+.ft-edit-modal-card .pict-tab:focus-visible {
+  color: var(--text);
+}
+
+.ft-edit-modal-card .pict-tab--active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ft-edit-modal-card [role="tabpanel"] {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ft-edit-modal-card #ft-panel-templates,
+.ft-edit-modal-card #ft-panel-saved {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.ft-edit-modal-card #ft-panel-search {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+.ft-edit-modal-card .vs-card-pict-grid {
+  max-height: none;
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
+.ft-edit-modal-card .vs-card-pict-option__label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  min-height: calc(1.2em * 2);
+  max-height: calc(1.2em * 2);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .ft-edit-modal-card {
+    height: min(560px, calc(100vh - 2rem));
+  }
+}
+
 .vs-card-pict-selected {
   min-height: 1px;
 }
@@ -458,6 +548,159 @@
   margin-top: 0.75rem;
   font-size: 0.72rem;
   color: var(--text-dim);
+}
+
+/* First / Then preview: card-focused UI polish (screen only) */
+.print-vs-first-then {
+  gap: 1rem;
+}
+
+.print-vs-first-then .vs-slot {
+  border: 1px solid color-mix(in oklab, var(--accent) 18%, var(--border));
+  border-radius: 0.9rem;
+  background: color-mix(in oklab, var(--bg-surface) 88%, var(--accent-dim));
+  padding: 0.8rem;
+  min-height: 220px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.6rem;
+}
+
+.print-vs-first-then .vs-slot:hover,
+.print-vs-first-then .vs-slot:focus-visible {
+  border-color: color-mix(in oklab, var(--accent) 65%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent), var(--shadow-sm);
+}
+
+.print-vs-first-then .vs-slot__header {
+  font-size: 1rem;
+  margin-bottom: 0.15rem;
+}
+
+.print-vs-first-then .vs-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px dashed var(--border);
+  border-radius: 0.75rem;
+  background: transparent;
+  padding: 0.45rem;
+  height: 100%;
+  transition: border-color 0.14s ease, transform 0.08s ease;
+}
+
+.print-vs-first-then .vs-card__main {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  min-height: 100%;
+}
+
+.print-vs-first-then .vs-card__img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  object-fit: contain;
+}
+
+.print-vs-first-then .vs-card__label {
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.print-vs-first-then .vs-slot__empty {
+  min-height: 100%;
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--bg-raised) 92%, transparent);
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.08s ease, box-shadow 0.1s ease;
+}
+
+.print-vs-first-then .vs-slot--empty-state .vs-slot__empty {
+  border-color: color-mix(in oklab, var(--border) 88%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border) 70%, transparent);
+}
+
+.print-vs-first-then .vs-slot--empty-state .vs-slot__empty-label,
+.print-vs-first-then .vs-slot--empty-state .vs-slot__empty-add {
+  transition: opacity 0.12s ease;
+}
+
+.print-vs-first-then .vs-slot--empty-state .vs-slot__empty-add {
+  display: none;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.print-vs-first-then .vs-slot--empty-state:hover .vs-slot__empty,
+.print-vs-first-then .vs-slot--empty-state:focus-visible .vs-slot__empty {
+  background: color-mix(in oklab, var(--accent) 24%, var(--bg-raised));
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--border));
+}
+
+.print-vs-first-then .vs-slot--empty-state:hover .vs-slot__empty-label,
+.print-vs-first-then .vs-slot--empty-state:focus-visible .vs-slot__empty-label {
+  display: none;
+}
+
+.print-vs-first-then .vs-slot--empty-state:hover .vs-slot__empty-add,
+.print-vs-first-then .vs-slot--empty-state:focus-visible .vs-slot__empty-add {
+  display: inline;
+}
+
+.print-vs-first-then .vs-slot--empty-state:active .vs-slot__empty {
+  background: color-mix(in oklab, var(--accent) 36%, var(--bg));
+  border-color: color-mix(in oklab, var(--accent) 70%, var(--border));
+  transform: translateY(1px) scale(0.995);
+  box-shadow: inset 0 2px 8px color-mix(in oklab, var(--bg) 45%, transparent);
+}
+
+.print-vs-first-then .vs-slot__hover-action {
+  display: none;
+}
+
+/* Filled-slot frosted Edit overlay */
+.print-vs-first-then .vs-slot:not(.vs-slot--empty-state) .vs-card::after {
+  content: "Edit";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: color-mix(in oklab, var(--bg) 52%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.print-vs-first-then .vs-slot:not(.vs-slot--empty-state):hover .vs-card::after,
+.print-vs-first-then .vs-slot:not(.vs-slot--empty-state):focus-visible .vs-card::after {
+  opacity: 1;
+}
+
+.print-vs-first-then .vs-slot:not(.vs-slot--empty-state):hover .vs-card,
+.print-vs-first-then .vs-slot:not(.vs-slot--empty-state):focus-visible .vs-card {
+  border-color: color-mix(in oklab, var(--accent) 55%, var(--border));
+}
+
+.print-vs-first-then .vs-slot:not(.vs-slot--empty-state):active .vs-card {
+  transform: translateY(1px) scale(0.995);
+}
+
+.print-vs-first-then .vs-slot:not(.vs-slot--empty-state):active .vs-card::after {
+  background: color-mix(in oklab, var(--bg) 65%, transparent);
 }
 
 @media (max-width: 980px) {

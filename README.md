@@ -52,6 +52,8 @@ cp .env.example .env
 # Edit .env — at minimum change DB_ROOT_PASSWORD, DB_PASSWORD, and SESSION_SECRET
 ```
 
+For local development without an SMTP server, set `SMTP_HOST=` (empty). The backend will log verification/reset links instead of sending emails.
+
 ### 2. Start
 
 ```bash
@@ -145,6 +147,8 @@ See [.env.example](.env.example) for all variables. Key ones:
 | `PICTOGRAM_PREFETCH_IDLE_MINUTES` | Required idle time before prefetch runs |
 | `PICTOGRAM_PREFETCH_BATCH_SIZE` | Number of IDs processed per prefetch run |
 | `PICTOGRAM_PREFETCH_INTERVAL_SECONDS` | Worker tick interval for checking idle/prefetch |
+
+If `SMTP_HOST` is empty, email sending is disabled and links are written to backend logs (recommended in local development).
 
 > **Note:** In `development` mode, password strength requirements are disabled and verification email links are printed to the backend log instead of sent.
 
